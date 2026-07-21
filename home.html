@@ -1,0 +1,157 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CIDB Livechat Email ID Cancellation / Pembatalan Email ID</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+  .chat-wrapper { width: 420px; max-width: 100%; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); display: flex; flex-direction: column; height: 680px; overflow: hidden; }
+  .chat-header { background: #1a5276; color: #fff; padding: 16px 20px; display: flex; align-items: center; gap: 12px; }
+  .chat-header .avatar { width: 40px; height: 40px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; overflow: hidden; }
+  .chat-header .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .chat-header h2 { font-size: 15px; font-weight: 700; }
+  .chat-header p { font-size: 12px; opacity: 0.85; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 82%; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; }
+  .msg.bot  { background: #eaf0fb; color: #1a1a1a; align-self: flex-start; border-bottom-left-radius: 4px; }
+  .msg.user { background: #1a5276; color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+  .msg.error{ background: #fdecea; color: #c0392b; align-self: flex-start; border-bottom-left-radius: 4px; }
+  .info-box  { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 13px; }
+  .warn-box  { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 13px; }
+  .typing { display: flex; align-items: center; gap: 5px; padding: 10px 14px; background: #eaf0fb; border-radius: 12px; align-self: flex-start; border-bottom-left-radius: 4px; }
+  .typing span { width: 7px; height: 7px; background: #1a5276; border-radius: 50%; animation: bounce 1.2s infinite; }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+  .chat-input-area { border-top: 1px solid #e0e0e0; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .input-row { display: flex; gap: 8px; align-items: flex-end; }
+  .chat-input-area input[type="text"] { flex: 1; border: 1px solid #ccc; border-radius: 20px; padding: 9px 14px; font-size: 13.5px; outline: none; transition: border 0.2s; }
+  .chat-input-area input[type="text"]:focus { border-color: #1a5276; }
+  .send-btn { background: #1a5276; color: #fff; border: none; border-radius: 50%; width: 38px; height: 38px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.2s; }
+  .send-btn:hover { background: #154360; }
+  .send-btn:disabled { background: #aaa; cursor: default; }
+  /* Upload panel */
+  .upload-area { display: none; flex-direction: column; gap: 8px; background: #f8f9fa; border-radius: 8px; padding: 10px 10px 12px; border: 1.5px dashed #1a5276; }
+  .upload-title { font-size: 12px; font-weight: 700; color: #1a5276; margin-bottom: 2px; }
+  .upload-slots { display: flex; gap: 6px; }
+  .upload-slot { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; background: #fff; border: 1.5px solid #d0dce8; border-radius: 8px; padding: 7px 4px 8px; cursor: pointer; transition: border-color 0.2s, background 0.2s; position: relative; min-width: 0; }
+  .upload-slot:hover { border-color: #1a5276; background: #eaf0fb; }
+  .upload-slot.has-file { border-color: #27ae60; background: #f0fdf4; }
+  .upload-slot .slot-icon { font-size: 20px; }
+  .upload-slot .slot-label { font-size: 10.5px; font-weight: 700; color: #1a5276; text-align: center; line-height: 1.3; }
+  .upload-slot .slot-sub { font-size: 9.5px; color: #888; text-align: center; }
+  .upload-slot .slot-check { position: absolute; top: 4px; right: 5px; font-size: 12px; display: none; }
+  .upload-slot.has-file .slot-check { display: block; }
+  .upload-slot .slot-thumb { width: 100%; max-height: 50px; object-fit: cover; border-radius: 4px; display: none; margin-top: 2px; }
+  .upload-slot.has-file .slot-thumb { display: block; }
+  .upload-slot input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-btn { background: #1a5276; color: #fff; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; cursor: pointer; align-self: stretch; margin-top: 2px; transition: background 0.2s; font-weight: 600; }
+  .upload-btn:hover:not(:disabled) { background: #154360; }
+  .upload-btn:disabled { background: #aaa; cursor: default; }
+  .quick-replies { display: flex; flex-wrap: wrap; gap: 6px; }
+  .qr-btn { background: #fff; border: 1.5px solid #1a5276; color: #1a5276; border-radius: 16px; padding: 6px 13px; font-size: 12px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
+  .qr-btn:hover { background: #1a5276; color: #fff; }
+  /* Signature pad modal */
+  .sig-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999; align-items: flex-end; justify-content: center; padding-bottom: 0; }
+  .sig-overlay.open { display: flex; }
+  .sig-modal { background: #fff; border-radius: 18px 18px 0 0; padding: 20px 18px 28px; width: 100%; max-width: 460px; box-shadow: 0 -6px 30px rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 12px; animation: slideUp 0.22s ease; }
+  @keyframes slideUp { from { transform: translateY(60px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .sig-handle { width: 40px; height: 4px; background: #ccc; border-radius: 2px; align-self: center; margin-bottom: 4px; }
+  .sig-title { font-size: 14px; font-weight: 700; color: #1a5276; text-align: center; }
+  .sig-sub   { font-size: 11.5px; color: #888; text-align: center; }
+  .sig-canvas-wrap { position: relative; border: 2px dashed #1a5276; border-radius: 10px; background: #f8faff; overflow: hidden; }
+  #sigCanvas { display: block; width: 100%; height: 170px; cursor: crosshair; touch-action: none; }
+  .sig-watermark { position: absolute; bottom: 8px; right: 10px; font-size: 10px; color: #c5d6e8; pointer-events: none; user-select: none; }
+  .sig-line { position: absolute; bottom: 36px; left: 14px; right: 14px; height: 1px; background: #d0dce8; pointer-events: none; }
+  .sig-actions { display: flex; gap: 8px; }
+  .sig-btn-clear   { flex: 1; background: #f0f2f5; color: #444; border: 1px solid #ccc; border-radius: 8px; padding: 10px; font-size: 13px; cursor: pointer; font-weight: 600; }
+  .sig-btn-clear:hover { background: #e2e5e9; }
+  .sig-btn-confirm { flex: 2; background: #1a5276; color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 13px; cursor: pointer; font-weight: 700; }
+  .sig-btn-confirm:hover { background: #154360; }
+  .sig-cancel { font-size: 12px; color: #aaa; text-align: center; cursor: pointer; }
+  .sig-cancel:hover { color: #666; }
+</style>
+</head>
+<body>
+<div class="chat-wrapper">
+<div class="chat-header">
+<div class="avatar"><img src="assets/images/avatar.png" alt="CIDB avatar"></div>
+<div>
+<h2>Bena CIDB Livechat</h2>
+<p>Email ID Cancellation / Pembatalan Email ID</p>
+</div>
+</div>
+<div class="chat-messages" id="chatMessages"></div>
+<div class="chat-input-area">
+<div class="upload-area" id="uploadArea">
+<div class="upload-title" id="uploadTitle">Upload documents / Muat naik dokumen</div>
+<div class="upload-slots">
+ 
+        <!-- Slot 1: Front IC -->
+<div class="upload-slot" id="slot-front" title="IC Front / IC Depan">
+<span class="slot-check">✓</span>
+<span class="slot-icon">🪪</span>
+<span class="slot-label" id="lbl-front">IC Front<br>IC Depan</span>
+<span class="slot-sub" id="sub-front">Tap to upload</span>
+<img class="slot-thumb" id="thumb-front">
+<input type="file" id="file-front" accept="image/*,.pdf"
+                 onchange="slotChanged('front')">
+</div>
+ 
+        <!-- Slot 2: Back IC -->
+<div class="upload-slot" id="slot-back" title="IC Back / IC Belakang">
+<span class="slot-check">✓</span>
+<span class="slot-icon">🔄</span>
+<span class="slot-label" id="lbl-back">IC Back<br>IC Belakang</span>
+<span class="slot-sub" id="sub-back">Tap to upload</span>
+<img class="slot-thumb" id="thumb-back">
+<input type="file" id="file-back" accept="image/*,.pdf"
+                 onchange="slotChanged('back')">
+</div>
+ 
+        <!-- Slot 3: Signature (opens drawing pad) -->
+<div class="upload-slot" id="slot-sig" title="Signature / Tandatangan" onclick="openSigPad()">
+<span class="slot-check">✓</span>
+<span class="slot-icon">✍️</span>
+<span class="slot-label" id="lbl-sig">Signature<br>Tandatangan</span>
+<span class="slot-sub" id="sub-sig">Tap to sign</span>
+<img class="slot-thumb" id="thumb-sig">
+</div>
+ 
+      </div>
+<button class="upload-btn" id="uploadBtn" onclick="submitIC()" disabled>
+        Submit / Hantar
+</button>
+</div>
+<div class="input-row">
+<input type="text" id="userInput" placeholder="Type a message / Taip mesej anda" onkeydown="if(event.key==='Enter')sendMessage()">
+<button class="send-btn" id="sendBtn" onclick="sendMessage()">&#9658;</button>
+</div>
+<div class="quick-replies" id="quickReplies"></div>
+</div>
+</div>
+ 
+<!-- Signature pad modal -->
+<div class="sig-overlay" id="sigOverlay">
+<div class="sig-modal">
+<div class="sig-handle"></div>
+<div class="sig-title" id="sigTitle">Draw your signature</div>
+<div class="sig-sub"   id="sigSub">Sign inside the box using your finger or mouse</div>
+<div class="sig-canvas-wrap">
+<canvas id="sigCanvas"></canvas>
+<div class="sig-line"></div>
+<div class="sig-watermark">CIDB</div>
+</div>
+<div class="sig-actions">
+<button class="sig-btn-clear"   id="sigClearBtn"   onclick="clearSig()"> Clear</button>
+<button class="sig-btn-confirm" id="sigConfirmBtn" onclick="confirmSig()"> Confirm / Sahkan</button>
+</div>
+<div class="sig-cancel" id="sigCancelLink" onclick="closeSigPad()">Cancel / Batal</div>
+</div>
+</div>
+ 
+<script src="frontend_api.js"></script>
+</body>
+</html>

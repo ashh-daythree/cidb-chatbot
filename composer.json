@@ -1,0 +1,17 @@
+{
+  "name": "cidb/chatbot-backend",
+  "description": "CIDB chatbot backend foundation",
+  "type": "project",
+  "require": {
+    "php": "^8.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "Cidb\\Backend\\": "backend/"
+    }
+  },
+  "config": {
+    "sort-packages": true
+  }
+}
+

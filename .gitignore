@@ -1,0 +1,4 @@
+.env
+backend/logs/
+backend/storage/documents/
+backend/uploads/
