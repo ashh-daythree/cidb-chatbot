@@ -9,11 +9,13 @@ use Cidb\Backend\Config\DatabaseConnection;
 use Cidb\Backend\Config\AppConfig;
 use Cidb\Backend\Config\CimsConfig;
 use Cidb\Backend\Config\DatabaseConfig;
+use Cidb\Backend\Config\OcrConfig;
 use Cidb\Backend\Config\LoggingConfig;
 use Cidb\Backend\Config\StorageConfig;
 use Cidb\Backend\Config\UploadConfig;
 use Cidb\Backend\Migrations\MigrationManager;
 use Cidb\Backend\Repositories\MigrationHistoryRepository;
+use Cidb\Backend\Services\OcrVerificationService;
 use Cidb\Backend\Storage\DocumentStorageInterface;
 use Cidb\Backend\Storage\LocalDocumentStorage;
 use Cidb\Backend\Utils\ErrorHandler;
@@ -33,6 +35,7 @@ final class Bootstrap
         $container->instance(LoggingConfig::class, $configuration->logging());
         $container->instance(CimsConfig::class, $configuration->cims());
         $container->instance(UploadConfig::class, UploadConfig::fromEnv());
+        $container->instance(OcrConfig::class, OcrConfig::fromEnv());
 
         $container->set(DatabaseConnection::class, static fn (Container $container): DatabaseConnection => new DatabaseConnection(
             $container->get(Configuration::class)->database()
@@ -61,6 +64,12 @@ final class Bootstrap
             'local' => new LocalDocumentStorage($container->get(StorageConfig::class)),
             default => new LocalDocumentStorage($container->get(StorageConfig::class)),
         });
+
+        $container->set(OcrVerificationService::class, static fn (Container $container): OcrVerificationService => new OcrVerificationService(
+            $container->get(DocumentStorageInterface::class),
+            $container->get(OcrConfig::class),
+            $container->get(Logger::class)
+        ));
 
         return $container;
     }

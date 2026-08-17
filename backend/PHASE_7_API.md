@@ -178,6 +178,66 @@ Validation errors:
 - invalid step transition
 - applicant data incomplete
 
+### POST /session/mobile
+
+Stores the applicant mobile number.
+
+Request:
+
+```json
+{
+  "session_id": "uuid",
+  "mobile": "+60123456789"
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "message": "Mobile saved.",
+  "data": {
+    "session": {}
+  }
+}
+```
+
+Validation errors:
+- missing `session_id`
+- missing or invalid mobile number
+- invalid step transition
+
+### POST /session/email
+
+Stores the applicant email address.
+
+Request:
+
+```json
+{
+  "session_id": "uuid",
+  "email": "name@example.com"
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "message": "Email saved.",
+  "data": {
+    "session": {}
+  }
+}
+```
+
+Validation errors:
+- missing `session_id`
+- missing or invalid email address
+- invalid step transition
+
 ### GET /session/{id}
 
 Returns the current session state and related records.
@@ -297,6 +357,8 @@ Response:
 Validation errors:
 - session not ready
 - missing session data
+- missing mobile number
+- missing email address
 - missing required documents
 - missing signature
 - incomplete applicant data

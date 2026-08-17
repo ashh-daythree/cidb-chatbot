@@ -34,57 +34,14 @@ final class RequestService extends AbstractService
     public function createFromSession(string $sessionId, ?string $requestTypeCode = null): array
     {
         return $this->transactional(function () use ($sessionId, $requestTypeCode): array {
-            $existing = $this->requestRepository->findBySessionId($sessionId);
-            if ($existing !== null) {
-                return $existing;
-            }
+            return $this->createRequestInternal($sessionId, $requestTypeCode, true);
+        });
+    }
 
-            $session = $this->sessionRepository->findById($sessionId);
-            if ($session === null) {
-                throw new AppException('Session not found.', 404, 'SESSION_NOT_FOUND');
-            }
-
-            $applicant = $this->applicantRepository->findBySessionId($sessionId);
-            if ($applicant === null) {
-                throw new AppException('Applicant record is missing.', 422, 'APPLICANT_MISSING');
-            }
-
-            $workflowId = (string) ($session['workflow_id'] ?? '');
-            if ($workflowId === '' || $this->workflowRepository->findById($workflowId) === null) {
-                throw new AppException('Workflow not found.', 422, 'WORKFLOW_INVALID');
-            }
-
-            $requestType = $requestTypeCode ?? 'EMAIL_ID_CANCELLATION';
-            if ($this->requestTypeRepository->findActiveByCode($requestType) === null) {
-                throw new AppException('Request type is invalid.', 422, 'REQUEST_TYPE_INVALID');
-            }
-
-            $payload = [
-                'request_number' => $this->generateRequestNumber(),
-                'workflow_id' => $workflowId,
-                'session_id' => $sessionId,
-                'applicant_id' => (string) $applicant['id'],
-                'request_type_code' => $requestType,
-                'status' => 'draft',
-                'submission_language_code' => (string) ($applicant['language_code'] ?? $session['language_code'] ?? 'en'),
-                'submitted_at' => null,
-                'latest_cims_status' => 'pending',
-                'final_outcome' => null,
-                'final_outcome_at' => null,
-                'closed_at' => null,
-                'created_at' => $this->now(),
-                'updated_at' => $this->now(),
-            ];
-
-            $request = $this->requestRepository->insert($payload);
-
-            $this->auditService->record('request_created', 'Service request created.', [
-                'session_id' => $sessionId,
-                'request_id' => $request['id'] ?? null,
-                'request_number' => $request['request_number'] ?? null,
-            ], 'info', $sessionId, $request['id'] ?? null);
-
-            return $request;
+    public function createCompanyFromSession(string $sessionId): array
+    {
+        return $this->transactional(function () use ($sessionId): array {
+            return $this->createRequestInternal($sessionId, 'COMPANY_EMAIL_ID_CANCELLATION', false);
         });
     }
 
@@ -123,6 +80,14 @@ final class RequestService extends AbstractService
         ]) ?? [];
     }
 
+    public function markStatus(string $requestId, string $status): array
+    {
+        return $this->requestRepository->update($requestId, [
+            'status' => $status,
+            'updated_at' => $this->now(),
+        ]) ?? [];
+    }
+
     public function findBySessionId(string $sessionId): ?array
     {
         return $this->requestRepository->findBySessionId($sessionId);
@@ -131,5 +96,105 @@ final class RequestService extends AbstractService
     public function findByRequestNumber(string $requestNumber): ?array
     {
         return $this->requestRepository->findByRequestNumber($requestNumber);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function createRequestInternal(string $sessionId, ?string $requestTypeCode, bool $requireApplicant): array
+    {
+        $existing = $this->requestRepository->findBySessionId($sessionId);
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        $session = $this->sessionRepository->findById($sessionId);
+        if ($session === null) {
+            throw new AppException('Session not found.', 404, 'SESSION_NOT_FOUND');
+        }
+
+        $draft = $this->decodeDraft($session['draft_payload'] ?? []);
+        $serviceType = strtolower(trim((string) ($draft['service_type'] ?? 'individual')));
+
+        if (!$requireApplicant && $serviceType !== 'company') {
+            throw new AppException('Company request requires the company service type.', 422, 'REQUEST_TYPE_INVALID');
+        }
+
+        $requestType = $requestTypeCode ?? 'EMAIL_ID_CANCELLATION';
+        if ($requestTypeCode === null && $serviceType === 'company') {
+            $requestType = 'COMPANY_EMAIL_ID_CANCELLATION';
+        }
+
+        if ($requireApplicant) {
+            $applicant = $this->applicantRepository->findBySessionId($sessionId);
+            if ($applicant === null) {
+                throw new AppException('Applicant record is missing.', 422, 'APPLICANT_MISSING');
+            }
+
+            $submissionLanguageCode = (string) ($applicant['language_code'] ?? $session['language_code'] ?? $draft['language_code'] ?? 'en');
+            $applicantId = (string) $applicant['id'];
+        } else {
+            $applicant = null;
+            $submissionLanguageCode = (string) ($session['language_code'] ?? $draft['language_code'] ?? 'en');
+            $applicantId = null;
+        }
+
+        $workflowId = (string) ($session['workflow_id'] ?? '');
+        if ($workflowId === '' || $this->workflowRepository->findById($workflowId) === null) {
+            throw new AppException('Workflow not found.', 422, 'WORKFLOW_INVALID');
+        }
+
+        if ($this->requestTypeRepository->findActiveByCode($requestType) === null) {
+            throw new AppException('Request type is invalid.', 422, 'REQUEST_TYPE_INVALID');
+        }
+
+        $payload = [
+            'request_number' => $this->generateRequestNumber(),
+            'workflow_id' => $workflowId,
+            'session_id' => $sessionId,
+            'applicant_id' => $applicantId,
+            'request_type_code' => $requestType,
+            'status' => 'draft',
+            'submission_language_code' => $submissionLanguageCode,
+            'submitted_at' => null,
+            'latest_cims_status' => 'pending',
+            'final_outcome' => null,
+            'final_outcome_at' => null,
+            'closed_at' => null,
+            'created_at' => $this->now(),
+            'updated_at' => $this->now(),
+        ];
+
+        $request = $this->requestRepository->insert($payload);
+
+        $this->auditService->record('request_created', 'Service request created.', [
+            'session_id' => $sessionId,
+            'request_id' => $request['id'] ?? null,
+            'request_number' => $request['request_number'] ?? null,
+            'request_type_code' => $requestType,
+            'service_type' => $serviceType,
+            'applicant_id' => $applicantId,
+        ], 'info', $sessionId, $request['id'] ?? null);
+
+        return $request;
+    }
+
+    /**
+     * @param array<string, mixed> $draft
+     * @return array<string, mixed>
+     */
+    private function decodeDraft(mixed $draft): array
+    {
+        if (is_array($draft)) {
+            return $draft;
+        }
+
+        if (is_string($draft) && $draft !== '') {
+            $decoded = json_decode($draft, true);
+
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        return [];
     }
 }

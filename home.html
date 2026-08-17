@@ -5,73 +5,105 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CIDB Livechat Email ID Cancellation / Pembatalan Email ID</title>
 <style>
+  :root {
+    --page-bg: #ffffff;
+    --chat-bg: #d7eff0;
+    --chat-surface: #f8fcfc;
+    --chat-header: #cfeaec;
+    --chat-header-line: #f0ad2d;
+    --chat-primary: #18a7a0;
+    --chat-primary-dark: #137f7a;
+    --chat-primary-soft: rgba(24, 167, 160, 0.12);
+    --chat-accent: #f0a12f;
+    --chat-accent-soft: #fff2d6;
+    --chat-text: #0f1d1f;
+    --chat-muted: #5f7073;
+    --chat-border: #c7dcdc;
+    --chat-border-strong: #9fc8c6;
+    --chat-user: #16918d;
+    --chat-bot: #ffffff;
+    --chat-info-bg: #ffffff;
+    --chat-info-border: #c9e7e4;
+    --chat-warning-bg: #fff6df;
+    --chat-warning-border: #efd184;
+    --chat-error-bg: #fdeaea;
+    --chat-error-border: #f1b8b3;
+    --chat-error-text: #c85a57;
+    --chat-success-bg: #edf9f4;
+    --chat-success-border: #b9e3d1;
+    --chat-overlay: rgba(15, 29, 31, 0.46);
+    --chat-shadow: rgba(15, 29, 31, 0.12);
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-  .chat-wrapper { width: 420px; max-width: 100%; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); display: flex; flex-direction: column; height: 680px; overflow: hidden; }
-  .chat-header { background: #1a5276; color: #fff; padding: 16px 20px; display: flex; align-items: center; gap: 12px; }
-  .chat-header .avatar { width: 40px; height: 40px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; overflow: hidden; }
+  body { font-family: Arial, sans-serif; background: var(--page-bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+  .chat-wrapper { width: 420px; max-width: 100%; background: var(--chat-bg); border-radius: 12px; box-shadow: 0 4px 20px var(--chat-shadow); display: flex; flex-direction: column; height: 680px; overflow: hidden; }
+  .chat-header { background: var(--chat-header); color: var(--chat-text); padding: 16px 20px 14px; display: flex; align-items: center; gap: 12px; border-bottom: 4px solid var(--chat-header-line); }
+  .chat-header .avatar { width: 40px; height: 40px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; overflow: hidden; box-shadow: 0 1px 6px rgba(15, 29, 31, 0.08); }
   .chat-header .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .chat-header h2 { font-size: 15px; font-weight: 700; }
-  .chat-header p { font-size: 12px; opacity: 0.85; }
-  .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
-  .msg { max-width: 82%; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; }
-  .msg.bot  { background: #eaf0fb; color: #1a1a1a; align-self: flex-start; border-bottom-left-radius: 4px; }
-  .msg.user { background: #1a5276; color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
-  .msg.error{ background: #fdecea; color: #c0392b; align-self: flex-start; border-bottom-left-radius: 4px; }
-  .info-box  { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 13px; }
-  .warn-box  { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 13px; }
-  .typing { display: flex; align-items: center; gap: 5px; padding: 10px 14px; background: #eaf0fb; border-radius: 12px; align-self: flex-start; border-bottom-left-radius: 4px; }
-  .typing span { width: 7px; height: 7px; background: #1a5276; border-radius: 50%; animation: bounce 1.2s infinite; }
+  .chat-header h2 { font-size: 15px; font-weight: 700; color: var(--chat-text); }
+  .chat-header p { font-size: 12px; opacity: 0.85; color: var(--chat-muted); }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--chat-bg); }
+  .msg { max-width: 82%; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; box-shadow: 0 1px 2px rgba(15, 29, 31, 0.04); }
+  .msg.bot  { background: var(--chat-bot); color: var(--chat-text); align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid rgba(255,255,255,0.8); }
+  .msg.user { background: var(--chat-user); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+  .msg.error{ background: var(--chat-error-bg); color: var(--chat-error-text); align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid var(--chat-error-border); }
+  .info-box  { background: var(--chat-info-bg); border: 1px solid var(--chat-info-border); border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 13px; }
+  .warn-box  { background: var(--chat-warning-bg); border: 1px solid var(--chat-warning-border); border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 13px; }
+  .typing { display: flex; align-items: center; gap: 5px; padding: 10px 14px; background: var(--chat-bot); border-radius: 12px; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid rgba(255,255,255,0.8); }
+  .typing span { width: 7px; height: 7px; background: var(--chat-primary); border-radius: 50%; animation: bounce 1.2s infinite; }
   .typing span:nth-child(2) { animation-delay: 0.2s; }
   .typing span:nth-child(3) { animation-delay: 0.4s; }
   @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
-  .chat-input-area { border-top: 1px solid #e0e0e0; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .chat-input-area { border-top: 1px solid var(--chat-border); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; background: linear-gradient(180deg, rgba(255,255,255,0.45), rgba(255,255,255,0.75)); }
   .input-row { display: flex; gap: 8px; align-items: flex-end; }
-  .chat-input-area input[type="text"] { flex: 1; border: 1px solid #ccc; border-radius: 20px; padding: 9px 14px; font-size: 13.5px; outline: none; transition: border 0.2s; }
-  .chat-input-area input[type="text"]:focus { border-color: #1a5276; }
-  .send-btn { background: #1a5276; color: #fff; border: none; border-radius: 50%; width: 38px; height: 38px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.2s; }
-  .send-btn:hover { background: #154360; }
-  .send-btn:disabled { background: #aaa; cursor: default; }
+  .chat-input-area input[type="text"] { flex: 1; border: 1px solid var(--chat-border); border-radius: 20px; padding: 9px 14px; font-size: 13.5px; outline: none; transition: border 0.2s, box-shadow 0.2s, background 0.2s; background: rgba(255,255,255,0.9); color: var(--chat-text); }
+  .chat-input-area input[type="text"]::placeholder { color: #8ca0a3; }
+  .chat-input-area input[type="text"]:focus { border-color: var(--chat-primary); box-shadow: 0 0 0 3px var(--chat-primary-soft); }
+  .send-btn { background: var(--chat-primary); color: #fff; border: none; border-radius: 50%; width: 38px; height: 38px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.2s, box-shadow 0.2s; }
+  .send-btn:hover { background: var(--chat-primary-dark); box-shadow: 0 0 0 3px var(--chat-primary-soft); }
+  .send-btn:disabled { background: #a7b9bb; cursor: default; }
   /* Upload panel */
-  .upload-area { display: none; flex-direction: column; gap: 8px; background: #f8f9fa; border-radius: 8px; padding: 10px 10px 12px; border: 1.5px dashed #1a5276; }
-  .upload-title { font-size: 12px; font-weight: 700; color: #1a5276; margin-bottom: 2px; }
+  .upload-area { display: none; flex-direction: column; gap: 8px; background: rgba(255,255,255,0.78); border-radius: 8px; padding: 10px 10px 12px; border: 1.5px dashed var(--chat-primary); }
+  .upload-title { font-size: 12px; font-weight: 700; color: var(--chat-primary); margin-bottom: 2px; }
   .upload-slots { display: flex; gap: 6px; }
-  .upload-slot { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; background: #fff; border: 1.5px solid #d0dce8; border-radius: 8px; padding: 7px 4px 8px; cursor: pointer; transition: border-color 0.2s, background 0.2s; position: relative; min-width: 0; }
-  .upload-slot:hover { border-color: #1a5276; background: #eaf0fb; }
-  .upload-slot.has-file { border-color: #27ae60; background: #f0fdf4; }
+  .upload-slot { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; background: rgba(255,255,255,0.95); border: 1.5px solid var(--chat-border); border-radius: 8px; padding: 7px 4px 8px; cursor: pointer; transition: border-color 0.2s, background 0.2s, box-shadow 0.2s; position: relative; min-width: 0; }
+  .upload-slot:hover { border-color: var(--chat-primary); background: #eefbfb; box-shadow: 0 0 0 3px rgba(24, 167, 160, 0.08); }
+  .upload-slot.has-file { border-color: var(--chat-primary); background: var(--chat-success-bg); }
   .upload-slot .slot-icon { font-size: 20px; }
-  .upload-slot .slot-label { font-size: 10.5px; font-weight: 700; color: #1a5276; text-align: center; line-height: 1.3; }
-  .upload-slot .slot-sub { font-size: 9.5px; color: #888; text-align: center; }
+  .upload-slot .slot-label { font-size: 10.5px; font-weight: 700; color: var(--chat-primary); text-align: center; line-height: 1.3; }
+  .upload-slot .slot-sub { font-size: 9.5px; color: var(--chat-muted); text-align: center; }
   .upload-slot .slot-check { position: absolute; top: 4px; right: 5px; font-size: 12px; display: none; }
   .upload-slot.has-file .slot-check { display: block; }
   .upload-slot .slot-thumb { width: 100%; max-height: 50px; object-fit: cover; border-radius: 4px; display: none; margin-top: 2px; }
   .upload-slot.has-file .slot-thumb { display: block; }
   .upload-slot input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-  .upload-btn { background: #1a5276; color: #fff; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; cursor: pointer; align-self: stretch; margin-top: 2px; transition: background 0.2s; font-weight: 600; }
-  .upload-btn:hover:not(:disabled) { background: #154360; }
-  .upload-btn:disabled { background: #aaa; cursor: default; }
+  .upload-btn { background: var(--chat-primary); color: #fff; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; cursor: pointer; align-self: stretch; margin-top: 2px; transition: background 0.2s, box-shadow 0.2s; font-weight: 600; }
+  .upload-btn:hover:not(:disabled) { background: var(--chat-primary-dark); box-shadow: 0 0 0 3px var(--chat-primary-soft); }
+  .upload-btn:disabled { background: #a7b9bb; cursor: default; }
   .quick-replies { display: flex; flex-wrap: wrap; gap: 6px; }
-  .qr-btn { background: #fff; border: 1.5px solid #1a5276; color: #1a5276; border-radius: 16px; padding: 6px 13px; font-size: 12px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
-  .qr-btn:hover { background: #1a5276; color: #fff; }
+  .qr-btn { background: rgba(255,255,255,0.9); border: 1.5px solid var(--chat-primary); color: var(--chat-primary); border-radius: 16px; padding: 6px 13px; font-size: 12px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
+  .qr-btn:hover { background: var(--chat-primary); color: #fff; }
   /* Signature pad modal */
-  .sig-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999; align-items: flex-end; justify-content: center; padding-bottom: 0; }
+  .sig-overlay { display: none; position: fixed; inset: 0; background: var(--chat-overlay); z-index: 999; align-items: flex-end; justify-content: center; padding-bottom: 0; }
   .sig-overlay.open { display: flex; }
-  .sig-modal { background: #fff; border-radius: 18px 18px 0 0; padding: 20px 18px 28px; width: 100%; max-width: 460px; box-shadow: 0 -6px 30px rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 12px; animation: slideUp 0.22s ease; }
+  .sig-modal { background: #fff; border-radius: 18px 18px 0 0; padding: 20px 18px 28px; width: 100%; max-width: 460px; box-shadow: 0 -6px 30px rgba(15, 29, 31, 0.18); display: flex; flex-direction: column; gap: 12px; animation: slideUp 0.22s ease; }
   @keyframes slideUp { from { transform: translateY(60px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-  .sig-handle { width: 40px; height: 4px; background: #ccc; border-radius: 2px; align-self: center; margin-bottom: 4px; }
-  .sig-title { font-size: 14px; font-weight: 700; color: #1a5276; text-align: center; }
-  .sig-sub   { font-size: 11.5px; color: #888; text-align: center; }
-  .sig-canvas-wrap { position: relative; border: 2px dashed #1a5276; border-radius: 10px; background: #f8faff; overflow: hidden; }
+  .sig-handle { width: 40px; height: 4px; background: #cbdad9; border-radius: 2px; align-self: center; margin-bottom: 4px; }
+  .sig-title { font-size: 14px; font-weight: 700; color: var(--chat-primary); text-align: center; }
+  .sig-sub   { font-size: 11.5px; color: var(--chat-muted); text-align: center; }
+  .sig-canvas-wrap { position: relative; border: 2px dashed var(--chat-primary); border-radius: 10px; background: #f8fdfd; overflow: hidden; }
   #sigCanvas { display: block; width: 100%; height: 170px; cursor: crosshair; touch-action: none; }
-  .sig-watermark { position: absolute; bottom: 8px; right: 10px; font-size: 10px; color: #c5d6e8; pointer-events: none; user-select: none; }
-  .sig-line { position: absolute; bottom: 36px; left: 14px; right: 14px; height: 1px; background: #d0dce8; pointer-events: none; }
+  .sig-watermark { position: absolute; bottom: 8px; right: 10px; font-size: 10px; color: rgba(24, 167, 160, 0.18); pointer-events: none; user-select: none; }
+  .sig-line { position: absolute; bottom: 36px; left: 14px; right: 14px; height: 1px; background: #d4e4e3; pointer-events: none; }
   .sig-actions { display: flex; gap: 8px; }
-  .sig-btn-clear   { flex: 1; background: #f0f2f5; color: #444; border: 1px solid #ccc; border-radius: 8px; padding: 10px; font-size: 13px; cursor: pointer; font-weight: 600; }
-  .sig-btn-clear:hover { background: #e2e5e9; }
-  .sig-btn-confirm { flex: 2; background: #1a5276; color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 13px; cursor: pointer; font-weight: 700; }
-  .sig-btn-confirm:hover { background: #154360; }
-  .sig-cancel { font-size: 12px; color: #aaa; text-align: center; cursor: pointer; }
-  .sig-cancel:hover { color: #666; }
+  .sig-btn-clear   { flex: 1; background: #eff7f7; color: var(--chat-primary-dark); border: 1px solid #d0e2e1; border-radius: 8px; padding: 10px; font-size: 13px; cursor: pointer; font-weight: 600; }
+  .sig-btn-clear:hover { background: #e4f3f2; }
+  .sig-btn-confirm { flex: 2; background: var(--chat-primary); color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 13px; cursor: pointer; font-weight: 700; }
+  .sig-btn-confirm:hover { background: var(--chat-primary-dark); }
+  .sig-btn-upload { background: #fff; color: var(--chat-primary); border: 1.5px solid var(--chat-primary); border-radius: 8px; padding: 9px; font-size: 12.5px; cursor: pointer; font-weight: 600; }
+  .sig-btn-upload:hover { background: #eefbfb; }
+  .sig-cancel { font-size: 12px; color: #8ca0a3; text-align: center; cursor: pointer; }
+  .sig-cancel:hover { color: var(--chat-primary-dark); }
 </style>
 </head>
 <body>
@@ -79,24 +111,24 @@
 <div class="chat-header">
 <div class="avatar"><img src="assets/images/avatar.png" alt="CIDB avatar"></div>
 <div>
-<h2>Bena CIDB Livechat</h2>
+<h2>Bena — CIDB Livechat</h2>
 <p>Email ID Cancellation / Pembatalan Email ID</p>
 </div>
 </div>
 <div class="chat-messages" id="chatMessages"></div>
 <div class="chat-input-area">
 <div class="upload-area" id="uploadArea">
-<div class="upload-title" id="uploadTitle">Upload documents / Muat naik dokumen</div>
+<div class="upload-title" id="uploadTitle">📎 Upload documents</div>
 <div class="upload-slots">
  
         <!-- Slot 1: Front IC -->
 <div class="upload-slot" id="slot-front" title="IC Front / IC Depan">
 <span class="slot-check">✓</span>
 <span class="slot-icon">🪪</span>
-<span class="slot-label" id="lbl-front">IC Front<br>IC Depan</span>
+<span class="slot-label" id="lbl-front">IC Front</span>
 <span class="slot-sub" id="sub-front">Tap to upload</span>
 <img class="slot-thumb" id="thumb-front">
-<input type="file" id="file-front" accept="image/*,.pdf"
+<input type="file" id="file-front" accept="image/jpeg,image/jpg,image/png,image/webp"
                  onchange="slotChanged('front')">
 </div>
  
@@ -104,18 +136,29 @@
 <div class="upload-slot" id="slot-back" title="IC Back / IC Belakang">
 <span class="slot-check">✓</span>
 <span class="slot-icon">🔄</span>
-<span class="slot-label" id="lbl-back">IC Back<br>IC Belakang</span>
+<span class="slot-label" id="lbl-back">IC Back</span>
 <span class="slot-sub" id="sub-back">Tap to upload</span>
 <img class="slot-thumb" id="thumb-back">
-<input type="file" id="file-back" accept="image/*,.pdf"
+<input type="file" id="file-back" accept="image/jpeg,image/jpg,image/png,image/webp"
                  onchange="slotChanged('back')">
 </div>
  
-        <!-- Slot 3: Signature (opens drawing pad) -->
+        <!-- Slot 3: SSM / PPK certificate -->
+<div class="upload-slot" id="slot-certificate" title="SSM / PPK Certificate" style="display:none">
+<span class="slot-check">✓</span>
+<span class="slot-icon">📄</span>
+<span class="slot-label" id="lbl-certificate">SSM / PPK Certificate</span>
+<span class="slot-sub" id="sub-certificate">Tap to upload</span>
+<img class="slot-thumb" id="thumb-certificate">
+<input type="file" id="file-certificate" accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
+                 onchange="slotChanged('certificate')">
+</div>
+ 
+        <!-- Slot 4: Signature (opens drawing pad) -->
 <div class="upload-slot" id="slot-sig" title="Signature / Tandatangan" onclick="openSigPad()">
 <span class="slot-check">✓</span>
 <span class="slot-icon">✍️</span>
-<span class="slot-label" id="lbl-sig">Signature<br>Tandatangan</span>
+<span class="slot-label" id="lbl-sig">Signature</span>
 <span class="slot-sub" id="sub-sig">Tap to sign</span>
 <img class="slot-thumb" id="thumb-sig">
 </div>
@@ -148,6 +191,8 @@
 <button class="sig-btn-clear"   id="sigClearBtn"   onclick="clearSig()"> Clear</button>
 <button class="sig-btn-confirm" id="sigConfirmBtn" onclick="confirmSig()"> Confirm / Sahkan</button>
 </div>
+<button class="sig-btn-upload" id="sigUploadBtn" onclick="document.getElementById('sigFileInput').click()">Upload signature image instead (JPG / PNG)</button>
+<input type="file" id="sigFileInput" accept="image/jpeg,image/jpg,image/png" style="display:none" onchange="sigFileUploaded()">
 <div class="sig-cancel" id="sigCancelLink" onclick="closeSigPad()">Cancel / Batal</div>
 </div>
 </div>

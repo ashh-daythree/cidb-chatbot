@@ -8,10 +8,18 @@ final class SessionValidator extends AbstractValidator
 {
     private const ALLOWED_STATUS = [
         'awaiting_language',
+        'awaiting_service',
         'awaiting_state',
         'awaiting_name',
         'awaiting_identity',
         'awaiting_documents',
+        'awaiting_company_ppk',
+        'awaiting_company_name',
+        'awaiting_company_email',
+        'awaiting_company_category',
+        'awaiting_company_director_name',
+        'awaiting_company_director_ic',
+        'awaiting_company_reason',
         'submitted',
         'under_review',
         'completed',
@@ -22,21 +30,41 @@ final class SessionValidator extends AbstractValidator
 
     private const ALLOWED_STEPS = [
         'ask_lang',
+        'ask_service',
         'ask_state',
         'ask_name',
         'ask_ic',
+        'ask_mobile',
+        'ask_email',
         'ask_ic_copy',
+        'ask_company_ppk',
+        'ask_company_name',
+        'ask_company_email',
+        'ask_company_category',
+        'ask_company_director_name',
+        'ask_company_director_ic',
+        'ask_company_reason',
         'done',
     ];
 
     /**
-     * @var array<string, string>
+     * @var array<string, string|array<int, string>>
      */
     private array $stepTransitions = [
         'ask_lang' => 'ask_state',
+        'ask_service' => ['ask_state', 'ask_company_ppk'],
         'ask_state' => 'ask_name',
         'ask_name' => 'ask_ic',
-        'ask_ic' => 'ask_ic_copy',
+        'ask_ic' => 'ask_mobile',
+        'ask_mobile' => 'ask_email',
+        'ask_email' => 'ask_ic_copy',
+        'ask_company_ppk' => 'ask_company_name',
+        'ask_company_name' => 'ask_company_email',
+        'ask_company_email' => ['ask_company_category', 'ask_company_director_name'],
+        'ask_company_category' => 'ask_company_director_name',
+        'ask_company_director_name' => 'ask_company_director_ic',
+        'ask_company_director_ic' => 'ask_company_reason',
+        'ask_company_reason' => 'ask_ic_copy',
         'ask_ic_copy' => 'done',
         'done' => 'done',
     ];
@@ -93,9 +121,10 @@ final class SessionValidator extends AbstractValidator
         }
 
         if ($currentStep !== '' && isset($this->stepTransitions[$currentStep])) {
+            $nextStep = $this->stepTransitions[$currentStep];
             $result = $result->withData([
                 'current_step' => $currentStep,
-                'next_step' => $this->stepTransitions[$currentStep],
+                'next_step' => is_array($nextStep) ? ($nextStep[0] ?? null) : $nextStep,
             ]);
         }
 
@@ -104,7 +133,16 @@ final class SessionValidator extends AbstractValidator
 
     public function isTransitionAllowed(string $currentStep, string $nextStep): bool
     {
-        return isset($this->stepTransitions[$currentStep]) && $this->stepTransitions[$currentStep] === $nextStep;
+        if (!isset($this->stepTransitions[$currentStep])) {
+            return false;
+        }
+
+        $allowed = $this->stepTransitions[$currentStep];
+        if (is_array($allowed)) {
+            return in_array($nextStep, $allowed, true);
+        }
+
+        return $allowed === $nextStep;
     }
 
     public function validateTransition(string $currentStep, string $nextStep): ValidationResult
@@ -141,4 +179,3 @@ final class SessionValidator extends AbstractValidator
         return self::ALLOWED_STEPS;
     }
 }
-

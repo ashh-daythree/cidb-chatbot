@@ -37,10 +37,18 @@ final class UploadService extends AbstractService
             }
 
             $maxBytes = $this->resolveMaxBytes($documentType, $options);
+            $allowedMimeTypes = $options['allowed_mime_types'] ?? json_decode((string) ($documentType['allowed_mime_types'] ?? '[]'), true) ?: [];
+            $allowedExtensions = $options['allowed_extensions'] ?? ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+
+            if ($this->requiresImageOnlyPolicy($documentTypeCode, $documentType)) {
+                $allowedMimeTypes = $this->filterImageMimeTypes($allowedMimeTypes);
+                $allowedExtensions = $this->filterImageExtensions($allowedExtensions);
+            }
+
             $policy = [
                 'field' => $options['field'] ?? $documentTypeCode,
-                'allowed_mime_types' => $options['allowed_mime_types'] ?? json_decode((string) ($documentType['allowed_mime_types'] ?? '[]'), true) ?: [],
-                'allowed_extensions' => $options['allowed_extensions'] ?? ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
+                'allowed_mime_types' => $allowedMimeTypes,
+                'allowed_extensions' => $allowedExtensions,
                 'max_bytes' => $maxBytes,
             ];
 
@@ -192,5 +200,39 @@ final class UploadService extends AbstractService
         }
 
         return 'user_upload';
+    }
+
+    /**
+     * @param array<string, mixed> $documentType
+     */
+    private function requiresImageOnlyPolicy(string $documentTypeCode, array $documentType): bool
+    {
+        if (in_array($documentTypeCode, ['IC_FRONT', 'IC_BACK'], true)) {
+            return true;
+        }
+
+        return filter_var($documentType['requires_ocr'] ?? false, FILTER_VALIDATE_BOOL);
+    }
+
+    /**
+     * @param array<int, mixed> $mimeTypes
+     * @return array<int, string>
+     */
+    private function filterImageMimeTypes(array $mimeTypes): array
+    {
+        $filtered = array_values(array_filter(array_map(static fn (mixed $mimeType): string => strtolower(trim((string) $mimeType)), $mimeTypes), static fn (string $mimeType): bool => str_starts_with($mimeType, 'image/')));
+
+        return $filtered !== [] ? $filtered : ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+    }
+
+    /**
+     * @param array<int, mixed> $extensions
+     * @return array<int, string>
+     */
+    private function filterImageExtensions(array $extensions): array
+    {
+        $filtered = array_values(array_filter(array_map(static fn (mixed $extension): string => strtolower(ltrim((string) $extension, '.')), $extensions), static fn (string $extension): bool => in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)));
+
+        return $filtered !== [] ? $filtered : ['jpg', 'jpeg', 'png', 'webp'];
     }
 }

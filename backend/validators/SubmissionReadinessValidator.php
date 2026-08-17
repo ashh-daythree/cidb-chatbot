@@ -11,7 +11,9 @@ final class SubmissionReadinessValidator extends AbstractValidator
         private readonly ?LanguageValidator $languageValidator = null,
         private readonly ?MalaysianStateValidator $stateValidator = null,
         private readonly ?FullNameValidator $fullNameValidator = null,
-        private readonly ?IdentityValidator $identityValidator = null
+        private readonly ?IdentityValidator $identityValidator = null,
+        private readonly ?MobileNumberValidator $mobileValidator = null,
+        private readonly ?EmailAddressValidator $emailValidator = null
     ) {
     }
 
@@ -28,6 +30,8 @@ final class SubmissionReadinessValidator extends AbstractValidator
         $stateValidator = $this->stateValidator ?? new MalaysianStateValidator();
         $fullNameValidator = $this->fullNameValidator ?? new FullNameValidator();
         $identityValidator = $this->identityValidator ?? new IdentityValidator();
+        $mobileValidator = $this->mobileValidator ?? new MobileNumberValidator();
+        $emailValidator = $this->emailValidator ?? new EmailAddressValidator();
 
         $result = ValidationResult::success();
 
@@ -73,7 +77,23 @@ final class SubmissionReadinessValidator extends AbstractValidator
             $result->addError('identity_number', 'identity_required', 'Identity number is required for submission.');
         }
 
+        if (isset($payload['mobile'])) {
+            $result->merge($mobileValidator->validate($payload['mobile']));
+        } else {
+            $result->addError('mobile', 'mobile_required', 'Mobile number is required for submission.');
+        }
+
+        if (isset($payload['email'])) {
+            $result->merge($emailValidator->validate($payload['email']));
+        } else {
+            $result->addError('email', 'email_required', 'Email address is required for submission.');
+        }
+
         $documents = is_array($payload['documents'] ?? null) ? $payload['documents'] : [];
+        $identityType = is_array($payload['identity_number'] ?? null)
+            ? mb_strtoupper((string) ($payload['identity_number']['identity_type'] ?? ''))
+            : '';
+        $isPassport = $identityType === 'PASSPORT';
 
         if ($documents === []) {
             $result->addError('documents', 'documents_required', 'Required documents are missing.');
@@ -85,9 +105,13 @@ final class SubmissionReadinessValidator extends AbstractValidator
             }
 
             if (!array_key_exists('back', $documents)) {
-                $result->addError('documents.back', 'back_document_required', 'IC back document is required.');
-            } else {
+                if (!$isPassport) {
+                    $result->addError('documents.back', 'back_document_required', 'IC back document is required.');
+                }
+            } elseif ($documents['back'] !== null && $documents['back'] !== []) {
                 $result->merge($this->validateStoredDocument($documents['back'], 'documents.back', 'IC_BACK'));
+            } elseif (!$isPassport) {
+                $result->addError('documents.back', 'back_document_required', 'IC back document is required.');
             }
 
             if (!array_key_exists('signature', $documents)) {

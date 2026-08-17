@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Cidb\Backend\Bootstrap\Bootstrap;
 use Cidb\Backend\Routes\ApiRouter;
+use Cidb\Backend\Utils\JsonHelper;
 use Cidb\Backend\Utils\ErrorHandler;
 
 require dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
@@ -81,4 +82,4 @@ if (PHP_SAPI !== 'cli') {
     header('Content-Type: application/json; charset=utf-8');
 }
 
-echo json_encode($response['payload'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+echo JsonHelper::encode($response['payload']);

@@ -23,9 +23,13 @@ final class SessionController extends AbstractController
     public function start(array $request): array
     {
         $payload = $this->payload($request);
-        $workflowCode = trim((string) ($payload['workflow_code'] ?? 'EMAIL_ID_CANCELLATION'));
+        $workflowCode = trim((string) ($payload['workflow_code'] ?? 'CIDB_EMAIL_ID_CANCELLATION'));
         if ($workflowCode === '') {
-            $workflowCode = 'EMAIL_ID_CANCELLATION';
+            $workflowCode = 'CIDB_EMAIL_ID_CANCELLATION';
+        }
+
+        if ($workflowCode === 'EMAIL_ID_CANCELLATION') {
+            $workflowCode = 'CIDB_EMAIL_ID_CANCELLATION';
         }
 
         $session = $this->sessionService->start($workflowCode);
@@ -46,6 +50,19 @@ final class SessionController extends AbstractController
         return $this->success([
             'session' => $session,
         ], 'Language saved.');
+    }
+
+    public function service(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+        $service = $payload['service_type'] ?? $payload['service'] ?? $payload['selection'] ?? $payload['choice'] ?? null;
+
+        $session = $this->sessionService->saveServiceSelection($sessionId, $service);
+
+        return $this->success([
+            'session' => $session,
+        ], 'Service saved.');
     }
 
     public function state(array $request): array
@@ -86,6 +103,124 @@ final class SessionController extends AbstractController
         ]);
 
         return $this->success($result, 'Identity saved.');
+    }
+
+    public function mobile(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+        $mobile = $payload['mobile'] ?? $payload['mobile_number'] ?? $payload['phone'] ?? $payload['phone_number'] ?? null;
+
+        $session = $this->sessionService->saveMobile($sessionId, $mobile);
+
+        return $this->success([
+            'session' => $session,
+        ], 'Mobile saved.');
+    }
+
+    public function email(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+        $email = $payload['email'] ?? $payload['email_address'] ?? null;
+
+        $session = $this->sessionService->saveEmail($sessionId, $email);
+
+        return $this->success([
+            'session' => $session,
+        ], 'Email saved.');
+    }
+
+    public function companyPpk(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+        $ppk = $payload['ppk_number'] ?? $payload['ssm_number'] ?? $payload['registration_number'] ?? $payload['company_number'] ?? null;
+
+        $session = $this->sessionService->saveCompanyPpkNumber($sessionId, $ppk);
+
+        return $this->success([
+            'session' => $session,
+        ], 'Company registration number saved.');
+    }
+
+    public function companyName(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+        $companyName = $payload['company_name'] ?? $payload['name'] ?? null;
+
+        $session = $this->sessionService->saveCompanyName($sessionId, $companyName);
+
+        return $this->success([
+            'session' => $session,
+        ], 'Company name saved.');
+    }
+
+    public function companyEmail(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+        $email = $payload['company_email'] ?? $payload['email'] ?? $payload['email_address'] ?? null;
+
+        $session = $this->sessionService->saveCompanyEmail($sessionId, $email);
+
+        return $this->success([
+            'session' => $session,
+        ], 'Company email saved.');
+    }
+
+    public function companyCategory(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+        $category = $payload['category'] ?? $payload['company_category'] ?? null;
+
+        $session = $this->sessionService->saveCompanyCategory($sessionId, $category);
+
+        return $this->success([
+            'session' => $session,
+        ], 'Company category saved.');
+    }
+
+    public function companyDirectorName(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+        $name = $payload['director_full_name'] ?? $payload['full_name'] ?? $payload['name'] ?? null;
+
+        $session = $this->sessionService->saveCompanyDirectorName($sessionId, $name);
+
+        return $this->success([
+            'session' => $session,
+        ], 'Director name saved.');
+    }
+
+    public function companyDirectorIdentity(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+        $identity = $payload['director_identity_number'] ?? $payload['identity_number'] ?? $payload['ic'] ?? $payload['passport'] ?? $payload['identity'] ?? null;
+
+        $result = $this->sessionService->saveCompanyDirectorIdentity($sessionId, [
+            'identity_type' => $payload['identity_type'] ?? null,
+            'identity_number' => $identity,
+        ]);
+
+        return $this->success($result, 'Director identity saved.');
+    }
+
+    public function companyReason(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+        $reason = $payload['reason'] ?? $payload['cancellation_reason'] ?? $payload['company_reason'] ?? null;
+
+        $session = $this->sessionService->saveCompanyReason($sessionId, $reason);
+
+        return $this->success([
+            'session' => $session,
+        ], 'Company cancellation reason saved.');
     }
 
     public function show(array $request): array

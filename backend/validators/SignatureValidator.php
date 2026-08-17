@@ -14,17 +14,22 @@ final class SignatureValidator extends AbstractValidator
             return $this->invalid('signature', 'signature_required', 'Signature is required.');
         }
 
-        if (!str_starts_with($dataUrl, 'data:image/png;base64,')) {
+        if (!preg_match('#^(data:image/(png|jpe?g);base64,)(.*)$#i', $dataUrl, $matches)) {
             return $this->invalid(
                 'signature',
                 'signature_invalid_format',
-                'Signature must be a valid PNG data URL.',
+                'Signature must be a valid PNG or JPEG data URL.',
                 null,
-                ['expected_prefix' => 'data:image/png;base64,']
+                ['expected_prefixes' => ['data:image/png;base64,', 'data:image/jpeg;base64,']]
             );
         }
 
-        $encoded = substr($dataUrl, strlen('data:image/png;base64,'));
+        $mimeType = strtolower((string) ($matches[2] ?? 'png'));
+        if ($mimeType === 'jpg') {
+            $mimeType = 'jpeg';
+        }
+        $fileExtension = $mimeType === 'jpeg' ? 'jpg' : 'png';
+        $encoded = (string) ($matches[3] ?? '');
         $decoded = base64_decode($encoded, true);
 
         if ($decoded === false || $decoded === '') {
@@ -35,8 +40,12 @@ final class SignatureValidator extends AbstractValidator
             return $this->invalid('signature', 'signature_too_small', 'Signature image is too small to be valid.');
         }
 
-        if (!str_starts_with($decoded, "\x89PNG\r\n\x1a\n")) {
+        if ($mimeType === 'png' && !str_starts_with($decoded, "\x89PNG\r\n\x1a\n")) {
             return $this->invalid('signature', 'signature_not_png', 'Signature must decode to a PNG image.');
+        }
+
+        if ($mimeType === 'jpeg' && !str_starts_with($decoded, "\xFF\xD8\xFF")) {
+            return $this->invalid('signature', 'signature_not_jpeg', 'Signature must decode to a JPEG image.');
         }
 
         if (!function_exists('getimagesizefromstring')) {
@@ -51,6 +60,8 @@ final class SignatureValidator extends AbstractValidator
         return ValidationResult::success([
             'signature_data_url' => $dataUrl,
             'signature_bytes' => $decoded,
+            'signature_mime_type' => $mimeType === 'jpeg' ? 'image/jpeg' : 'image/png',
+            'signature_file_extension' => $fileExtension,
             'signature_width' => (int) $imageInfo[0],
             'signature_height' => (int) $imageInfo[1],
         ]);

@@ -27,6 +27,8 @@ final class SignatureService extends AbstractService
         }
 
         $bytes = (string) ($validation->data()['signature_bytes'] ?? '');
+        $mimeType = (string) ($validation->data()['signature_mime_type'] ?? 'image/png');
+        $fileExtension = (string) ($validation->data()['signature_file_extension'] ?? 'png');
         if ($bytes === '') {
             throw new AppException('Signature bytes are missing.', 422, 'SIGNATURE_BYTES_MISSING');
         }
@@ -38,11 +40,11 @@ final class SignatureService extends AbstractService
             $bytes,
             array_merge($options, [
                 'field' => 'signature',
-                'name' => 'signature.png',
-                'mime_type' => 'image/png',
+                'name' => 'signature.' . $fileExtension,
+                'mime_type' => $mimeType,
                 'upload_source' => 'signature_pad',
-                'allowed_mime_types' => ['image/png'],
-                'allowed_extensions' => ['png'],
+                'allowed_mime_types' => ['image/png', 'image/jpeg'],
+                'allowed_extensions' => ['png', 'jpg', 'jpeg'],
                 'max_bytes' => 1024 * 1024 * 5,
             ])
         );

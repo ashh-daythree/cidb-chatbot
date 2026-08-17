@@ -15,11 +15,11 @@ final class PassportValidator extends AbstractValidator
             return $this->invalid('passport', 'passport_required', 'Passport number is required.');
         }
 
-        if (preg_match('/^[A-Z0-9]{6,20}$/', $normalized) !== 1) {
+        if (preg_match('/^(?=.*\d)[A-Z0-9]{6,20}$/', $normalized) !== 1) {
             return $this->invalid(
                 'passport',
                 'passport_invalid_format',
-                'Passport number must be 6 to 20 alphanumeric characters.',
+                'Passport number must be 6 to 20 alphanumeric characters and contain at least one digit.',
                 $value
             );
         }
@@ -31,4 +31,3 @@ final class PassportValidator extends AbstractValidator
         ]);
     }
 }
-

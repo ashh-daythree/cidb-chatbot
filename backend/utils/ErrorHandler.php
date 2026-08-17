@@ -56,7 +56,6 @@ final class ErrorHandler
             header('Content-Type: application/json; charset=utf-8');
         }
 
-        echo json_encode($payload['payload'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+        echo JsonHelper::encode($payload['payload']);
     }
 }
-

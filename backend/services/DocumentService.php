@@ -91,9 +91,32 @@ final class DocumentService extends AbstractService
     /**
      * @return array{missing: array<int, string>, present: array<int, string>}
      */
-    public function resolveRequiredDocumentCoverage(array $documents): array
+    public function resolveRequiredDocumentCoverage(array $documents, ?string $serviceType = null, ?string $identityType = null): array
     {
-        $requiredCodes = array_column($this->findRequiredDocumentTypes(), 'document_type_code');
+        $requiredCodes = array_values(array_unique(array_column($this->findRequiredDocumentTypes(), 'document_type_code')));
+        $serviceType = mb_strtolower(trim((string) $serviceType));
+        $identityType = mb_strtoupper(trim((string) $identityType));
+        $isPassport = $identityType === 'PASSPORT';
+
+        if ($serviceType === 'company') {
+            $requiredCodes = array_values(array_diff($requiredCodes, ['SIGNATURE']));
+            if (!in_array('SSM_PPK_CERTIFICATE', $requiredCodes, true)) {
+                $requiredCodes[] = 'SSM_PPK_CERTIFICATE';
+            }
+        } else {
+            $requiredCodes = array_values(array_diff($requiredCodes, ['SSM_PPK_CERTIFICATE']));
+            if (!in_array('SIGNATURE', $requiredCodes, true)) {
+                $requiredCodes[] = 'SIGNATURE';
+            }
+        }
+
+        if ($isPassport) {
+            $requiredCodes = array_values(array_filter(
+                $requiredCodes,
+                static fn (string $code): bool => $code !== 'IC_BACK'
+            ));
+        }
+
         $presentCodes = array_values(array_unique(array_map(
             static fn (array $document): string => (string) ($document['document_type_code'] ?? ''),
             $documents
@@ -112,4 +135,3 @@ final class DocumentService extends AbstractService
         return $this->verificationRepository->findLatestByUploadedDocumentId($uploadedDocumentId);
     }
 }
-

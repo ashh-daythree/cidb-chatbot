@@ -33,101 +33,28 @@ final class RpaBotService
     public function triggerTicketInsert(array $payload): array
     {
         $endpoint = trim((string) EnvironmentLoader::get('RPA_BOT_ENDPOINT', self::DEFAULT_ENDPOINT));
-        $apiKey = $this->resolveApiKey();
-        $timeoutMs = max(1000, (int) EnvironmentLoader::get('RPA_BOT_TIMEOUT_MS', 15000));
-        $connectTimeoutMs = max(1000, (int) EnvironmentLoader::get('RPA_BOT_CONNECT_TIMEOUT_MS', 5000));
-        $requestBody = JsonHelper::encode($payload);
+        return $this->triggerAtEndpoint($endpoint, $payload, 'RPA bot API');
+    }
 
-        $this->logger->info('Triggering RPA bot API.', [
-            'endpoint' => $endpoint,
-            'has_api_key' => $apiKey !== '',
-            'payload' => $this->maskForLog($payload),
-        ]);
-
-        $startedAt = microtime(true);
-        $statusCode = 0;
-        $rawResponse = '';
-        $errorMessage = null;
-        $parsedResponse = null;
-
-        try {
-            if (!function_exists('curl_init')) {
-                throw new AppException('cURL is not available.', 500, 'CURL_UNAVAILABLE');
-            }
-
-            $curl = curl_init($endpoint);
-            if ($curl === false) {
-                throw new AppException('Unable to initialize the RPA bot request.', 500, 'CURL_INIT_FAILED');
-            }
-
-            curl_setopt_array($curl, [
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => $requestBody,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_HTTPHEADER => [
-                    'Content-Type: application/json',
-                    'Accept: application/json',
-                    'X-API-Key: ' . $apiKey,
-                ],
-                CURLOPT_CONNECTTIMEOUT_MS => $connectTimeoutMs,
-                CURLOPT_TIMEOUT_MS => $timeoutMs,
-            ]);
-
-            $response = curl_exec($curl);
-            $statusCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
-
-            if ($response === false) {
-                $errorMessage = curl_error($curl) ?: 'The RPA bot request failed.';
-                $rawResponse = '';
-            } else {
-                $rawResponse = (string) $response;
-            }
-
-            curl_close($curl);
-        } catch (Throwable $throwable) {
-            $errorMessage = $throwable->getMessage() !== '' ? $throwable->getMessage() : 'The RPA bot request failed.';
-            $rawResponse = $rawResponse !== '' ? $rawResponse : $errorMessage;
-            $this->logger->error('RPA bot API request failed.', [
-                'endpoint' => $endpoint,
-                'error' => $errorMessage,
-            ]);
-
-            $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
-
-            return [
-                'success' => false,
-                'status_code' => $statusCode,
-                'raw_response_text' => $rawResponse,
-                'parsed_response' => null,
-                'duration_ms' => $durationMs,
-                'error_message' => $errorMessage,
-            ];
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{
+     *     success: bool,
+     *     status_code: int,
+     *     raw_response_text: string,
+     *     parsed_response: array<string, mixed>|null,
+     *     duration_ms: int,
+     *     error_message: ?string
+     * }
+     */
+    public function triggerCompanyCancellation(array $payload): array
+    {
+        $endpoint = trim((string) EnvironmentLoader::get('RPA_COMPANY_BOT_ENDPOINT', ''));
+        if ($endpoint === '') {
+            $endpoint = trim((string) EnvironmentLoader::get('RPA_BOT_ENDPOINT', self::DEFAULT_ENDPOINT));
         }
 
-        if ($rawResponse !== '') {
-            $decoded = json_decode($rawResponse, true);
-            if (is_array($decoded)) {
-                $parsedResponse = $decoded;
-            }
-        }
-
-        $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
-
-        $this->logger->info('RPA bot API response received.', [
-            'endpoint' => $endpoint,
-            'status_code' => $statusCode,
-            'duration_ms' => $durationMs,
-            'response' => $this->summarizeResponse($rawResponse, $parsedResponse),
-        ]);
-
-        return [
-            'success' => $statusCode >= 200 && $statusCode < 300,
-            'status_code' => $statusCode,
-            'raw_response_text' => $rawResponse,
-            'parsed_response' => $parsedResponse,
-            'duration_ms' => $durationMs,
-            'error_message' => $statusCode >= 200 && $statusCode < 300 ? null : ('RPA bot request failed with status ' . $statusCode . '.'),
-        ];
+        return $this->triggerAtEndpoint($endpoint, $payload, 'Company RPA bot API');
     }
 
     /**
@@ -196,5 +123,115 @@ final class RpaBotService
         }
 
         return $apiKey;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{
+     *     success: bool,
+     *     status_code: int,
+     *     raw_response_text: string,
+     *     parsed_response: array<string, mixed>|null,
+     *     duration_ms: int,
+     *     error_message: ?string
+     * }
+     */
+    private function triggerAtEndpoint(string $endpoint, array $payload, string $logLabel): array
+    {
+        $apiKey = $this->resolveApiKey();
+        $timeoutMs = max(1000, (int) EnvironmentLoader::get('RPA_BOT_TIMEOUT_MS', 15000));
+        $connectTimeoutMs = max(1000, (int) EnvironmentLoader::get('RPA_BOT_CONNECT_TIMEOUT_MS', 5000));
+        $requestBody = JsonHelper::encode($payload);
+
+        $this->logger->info('Triggering ' . $logLabel . '.', [
+            'endpoint' => $endpoint,
+            'has_api_key' => $apiKey !== '',
+            'payload' => $this->maskForLog($payload),
+        ]);
+
+        $startedAt = microtime(true);
+        $statusCode = 0;
+        $rawResponse = '';
+        $errorMessage = null;
+        $parsedResponse = null;
+
+        try {
+            if (!function_exists('curl_init')) {
+                throw new AppException('cURL is not available.', 500, 'CURL_UNAVAILABLE');
+            }
+
+            $curl = curl_init($endpoint);
+            if ($curl === false) {
+                throw new AppException('Unable to initialize the RPA bot request.', 500, 'CURL_INIT_FAILED');
+            }
+
+            curl_setopt_array($curl, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $requestBody,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Accept: application/json',
+                    'X-API-Key: ' . $apiKey,
+                ],
+                CURLOPT_CONNECTTIMEOUT_MS => $connectTimeoutMs,
+                CURLOPT_TIMEOUT_MS => $timeoutMs,
+            ]);
+
+            $response = curl_exec($curl);
+            $statusCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+
+            if ($response === false) {
+                $errorMessage = curl_error($curl) ?: 'The RPA bot request failed.';
+                $rawResponse = '';
+            } else {
+                $rawResponse = (string) $response;
+            }
+
+            curl_close($curl);
+        } catch (Throwable $throwable) {
+            $errorMessage = $throwable->getMessage() !== '' ? $throwable->getMessage() : 'The RPA bot request failed.';
+            $rawResponse = $rawResponse !== '' ? $rawResponse : $errorMessage;
+            $this->logger->error($logLabel . ' request failed.', [
+                'endpoint' => $endpoint,
+                'error' => $errorMessage,
+            ]);
+
+            $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+
+            return [
+                'success' => false,
+                'status_code' => $statusCode,
+                'raw_response_text' => $rawResponse,
+                'parsed_response' => null,
+                'duration_ms' => $durationMs,
+                'error_message' => $errorMessage,
+            ];
+        }
+
+        if ($rawResponse !== '') {
+            $decoded = json_decode($rawResponse, true);
+            if (is_array($decoded)) {
+                $parsedResponse = $decoded;
+            }
+        }
+
+        $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+
+        $this->logger->info($logLabel . ' response received.', [
+            'endpoint' => $endpoint,
+            'status_code' => $statusCode,
+            'duration_ms' => $durationMs,
+            'response' => $this->summarizeResponse($rawResponse, $parsedResponse),
+        ]);
+
+        return [
+            'success' => $statusCode >= 200 && $statusCode < 300,
+            'status_code' => $statusCode,
+            'raw_response_text' => $rawResponse,
+            'parsed_response' => $parsedResponse,
+            'duration_ms' => $durationMs,
+            'error_message' => $statusCode >= 200 && $statusCode < 300 ? null : ('RPA bot request failed with status ' . $statusCode . '.'),
+        ];
     }
 }

@@ -27,6 +27,7 @@ final class CimsVerificationResult extends AbstractModel
             'external_reference_no',
             'latency_ms',
             'rpa_response_text',
+            'display_message',
             'response_payload',
             'verified_at',
             'created_at',
