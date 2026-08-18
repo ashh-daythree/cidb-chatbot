@@ -2,3 +2,6 @@
 backend/logs/
 backend/storage/documents/
 backend/uploads/
+ocr/.venv/
+ocr/.env
+ocr/**/__pycache__/
