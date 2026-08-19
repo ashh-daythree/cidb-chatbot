@@ -195,7 +195,7 @@ final class VerificationService extends AbstractService
         $identificationNumber = $this->resolveIdentificationNumber($context, $applicant);
         $botPayload = [
             'company' => 'CIDB',
-            'scenario_key' => 'cims',
+            'scenario_key' => 'cidb_masterbot',
             'channel' => 'Chatbot',
             'fields' => [
                 'sCustomerType' => 'Individual',
@@ -242,7 +242,7 @@ final class VerificationService extends AbstractService
 
         $payload = [
             'company' => 'CIDB',
-            'scenario_key' => 'cims',
+            'scenario_key' => 'cidb_masterbot',
             'channel' => 'Chatbot',
             'fields' => [
                 'sCustomerType' => 'Company',
