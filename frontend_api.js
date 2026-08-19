@@ -777,6 +777,22 @@ function buildCompanyTextPayload(text) {
   return normalized ? { value: normalized } : null;
 }
 
+function buildCompanyPpkPayload(text) {
+  const value = String(text || '').trim().toUpperCase();
+  if (!value) return null;
+
+  const modernMatch = /^(\d{4})(0[1-6])(\d{6})$/.exec(value);
+  if (modernMatch) {
+    return { value };
+  }
+
+  if (/^(?:[A-Z]{0,3})\d{7}-[A-Z]$/.test(value)) {
+    return { value };
+  }
+
+  return null;
+}
+
 async function uploadDocument(slotId, file) {
   const form = new FormData();
   form.append('session_id', state.sessionId);
@@ -872,8 +888,8 @@ function renderOcrVerificationBubble(ocrVerification) {
 
   const status = String(ocrVerification.status || '').trim().toUpperCase();
   const heading = status === 'VERIFIED'
-    ? (state.en ? 'OCR verification completed.' : 'Pengesahan OCR selesai.')
-    : (state.en ? 'OCR verification requires attention.' : 'Pengesahan OCR memerlukan perhatian.');
+    ? (state.en ? 'ID verification completed successfully.' : 'Pengesahan ID berjaya diselesaikan.')
+    : (state.en ? 'ID verification requires attention.' : 'Pengesahan ID memerlukan perhatian.');
 
   return `<strong>${escapeHtml(heading)}</strong><br>${escapeHtml(message)}`;
 }
@@ -1269,10 +1285,10 @@ async function handleStep(text) {
   }
 
   if (state.step === 'ask_company_ppk') {
-    const payload = buildCompanyTextPayload(text);
+    const payload = buildCompanyPpkPayload(text);
     if (!payload) {
-      await showApiError({ message: 'Invalid PPK / SSM number.', errors: { ppk_number: 'PPK / SSM number is required.' } }, 'Invalid PPK / SSM number.');
-      await addMsg(state.en ? 'Please provide your <strong>PPK / SSM number</strong>.' : 'Sila berikan <strong>nombor PPK / SSM</strong> anda.');
+      await showApiError({ message: 'Please enter a valid PPK / SSM number.', errors: { ppk_number: 'Please enter a valid PPK / SSM number.' } }, 'Please enter a valid PPK / SSM number.');
+      await addMsg(state.en ? 'Please enter a valid <strong>PPK / SSM number</strong>.' : 'Sila masukkan <strong>nombor PPK / SSM</strong> yang sah.');
       setInput(true);
       return;
     }
@@ -1289,7 +1305,7 @@ async function handleStep(text) {
       return;
     } catch (error) {
       await showApiError(error, 'Unable to save company number.');
-      await addMsg(state.en ? 'Please provide your <strong>PPK / SSM number</strong>.' : 'Sila berikan <strong>nombor PPK / SSM</strong> anda.');
+      await addMsg(state.en ? 'Please enter a valid <strong>PPK / SSM number</strong>.' : 'Sila masukkan <strong>nombor PPK / SSM</strong> yang sah.');
       setInput(true);
       return;
     }
@@ -1886,10 +1902,8 @@ async function submitIC() {
   await addMsg(`Documents submitted:<br>${names.join('<br>')}`, 'user');
   await showTyping(900);
   await addMsg(isCompanyService()
-    ? (en ? 'Thank you. We are reviewing your submitted company documents...' : 'Terima kasih. Kami sedang menyemak dokumen syarikat yang dihantar...')
-    : (en ? 'Thank you. We are reviewing your submitted documents...' : 'Terima kasih. Kami sedang menyemak dokumen yang dihantar...'));
-  await showTyping(1400);
-  await addMsg(en ? '<strong>All documents have been received.</strong>' : '<strong>Semua dokumen telah diterima.</strong>');
+    ? (en ? 'Thank you. We\'ve received your company documents and are reviewing them.' : 'Terima kasih. Kami telah menerima dokumen syarikat anda dan sedang menyemaknya.')
+    : (en ? 'Thank you. We\'ve received your documents and are reviewing them.' : 'Terima kasih. Kami telah menerima dokumen anda dan sedang menyemaknya.'));
   await showTyping(650);
   await addMsg(isCompanyService()
     ? (en
@@ -1931,8 +1945,8 @@ async function submitIC() {
         ocrVerification?.message,
         data.message,
         en
-          ? 'OCR verification failed. Please re-upload the documents.'
-          : 'Pengesahan OCR gagal. Sila muat naik semula dokumen.'
+          ? 'ID verification failed. Please re-upload the documents.'
+          : 'Pengesahan ID gagal. Sila muat naik semula dokumen.'
       );
       await addMsg(renderOcrVerificationBubble({ ...ocrVerification, message: ocrMessage }), 'error');
       state.step = 'ask_ic_copy';

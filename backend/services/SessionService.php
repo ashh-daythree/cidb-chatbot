@@ -10,6 +10,7 @@ use Cidb\Backend\Repositories\ChatbotWorkflowRepository;
 use Cidb\Backend\Repositories\ReferenceLanguageRepository;
 use Cidb\Backend\Utils\JsonHelper;
 use Cidb\Backend\Validators\EmailAddressValidator;
+use Cidb\Backend\Validators\CompanyPpkValidator;
 use Cidb\Backend\Validators\FullNameValidator;
 use Cidb\Backend\Validators\IdentityValidator;
 use Cidb\Backend\Validators\LanguageValidator;
@@ -29,6 +30,7 @@ final class SessionService extends AbstractService
         private readonly LanguageValidator $languageValidator,
         private readonly MalaysianStateValidator $stateValidator,
         private readonly FullNameValidator $fullNameValidator,
+        private readonly CompanyPpkValidator $companyPpkValidator,
         private readonly IdentityValidator $identityValidator,
         private readonly MobileNumberValidator $mobileValidator,
         private readonly EmailAddressValidator $emailValidator,
@@ -320,7 +322,34 @@ final class SessionService extends AbstractService
 
     public function saveCompanyPpkNumber(string $sessionId, mixed $ppkInput): array
     {
-        return $this->saveCompanyDraftField($sessionId, 'ask_company_ppk', 'ask_company_name', 'awaiting_company_name', 'company_ppk_number', $ppkInput, 'session_company_ppk_saved', 'Company PPK/SSM number saved.', 'COMPANY_PPK_REQUIRED');
+        return $this->transactional(function () use ($sessionId, $ppkInput): array {
+            $session = $this->requireSession($sessionId);
+            $this->assertStep($session, 'ask_company_ppk', 'ask_company_name');
+
+            $validated = $this->companyPpkValidator->validate($ppkInput, 'ppk_number');
+            if (!$validated->isValid()) {
+                throw new AppException('Please enter a valid PPK / SSM number.', 422, 'COMPANY_PPK_INVALID', $validated->errors());
+            }
+
+            $draft = $this->decodeDraft($session['draft_payload'] ?? []);
+            $draft['company_ppk_number'] = (string) ($validated->data()['ppk_number'] ?? '');
+
+            $updated = $this->sessionRepository->update($sessionId, [
+                'status' => 'awaiting_company_name',
+                'current_step' => 'ask_company_name',
+                'draft_payload' => $this->encodeDraft($draft),
+                'last_activity_at' => $this->now(),
+                'updated_at' => $this->now(),
+            ]);
+
+            $this->auditService->record('session_company_ppk_saved', 'Company PPK/SSM number saved.', [
+                'session_id' => $sessionId,
+                'company_ppk_number' => $draft['company_ppk_number'],
+                'ppk_number_format' => $validated->data()['ppk_number_format'] ?? null,
+            ], 'info', $sessionId);
+
+            return $updated ?? $session;
+        });
     }
 
     public function saveCompanyName(string $sessionId, mixed $nameInput): array
