@@ -6,6 +6,7 @@ namespace Cidb\Backend\Services;
 
 use Cidb\Backend\Config\DatabaseConnection;
 use Cidb\Backend\Repositories\DocumentVerificationRepository;
+use Cidb\Backend\Validators\CompanyPpkValidator;
 use Cidb\Backend\Validators\SubmissionReadinessValidator;
 use Cidb\Backend\Utils\JsonHelper;
 use Cidb\Backend\Utils\Exceptions\AppException;
@@ -23,6 +24,7 @@ final class SubmissionService extends AbstractService
         private readonly DocumentVerificationRepository $documentVerificationRepository,
         private readonly StatusService $statusService,
         private readonly SubmissionReadinessValidator $readinessValidator,
+        private readonly CompanyPpkValidator $companyPpkValidator,
         private readonly AuditService $auditService
     ) {
         parent::__construct($connection);
@@ -56,7 +58,7 @@ final class SubmissionService extends AbstractService
 
                 if (($ocrVerification['should_continue'] ?? false) !== true) {
                     return [
-                        'message' => (string) ($ocrVerification['message'] ?? 'OCR verification requires reupload.'),
+                        'message' => (string) ($ocrVerification['message'] ?? 'ID verification requires re-upload.'),
                         'next_action' => 'reupload',
                         'session' => $this->sessionService->getById($sessionId),
                         'applicant' => $this->applicantService->findBySessionId($sessionId),
@@ -148,7 +150,7 @@ final class SubmissionService extends AbstractService
 
             if (($ocrVerification['should_continue'] ?? false) !== true) {
                 return [
-                    'message' => (string) ($ocrVerification['message'] ?? 'OCR verification requires reupload.'),
+                    'message' => (string) ($ocrVerification['message'] ?? 'ID verification requires re-upload.'),
                     'next_action' => 'reupload',
                     'session' => $this->sessionService->getById($sessionId),
                     'applicant' => null,
@@ -556,13 +558,10 @@ final class SubmissionService extends AbstractService
             'identity_number' => $snapshot['director']['identity_number'] ?? null,
         ]);
         $companyEmailResult = $emailValidator->validate($snapshot['company']['company_email'] ?? null);
+        $companyPpkResult = $this->companyPpkValidator->validate($snapshot['company']['ppk_number'] ?? null, 'company.ppk_number');
 
-        foreach ([$languageResult, $directorNameResult, $directorIdentityResult, $companyEmailResult] as $validationResult) {
+        foreach ([$languageResult, $directorNameResult, $directorIdentityResult, $companyEmailResult, $companyPpkResult] as $validationResult) {
             $result->merge($validationResult);
-        }
-
-        if (trim((string) ($snapshot['company']['ppk_number'] ?? '')) === '') {
-            $result->addError('company.ppk_number', 'ppk_required', 'PPK / SSM number is required.');
         }
 
         if (trim((string) ($snapshot['company']['company_name'] ?? '')) === '') {
@@ -659,7 +658,7 @@ final class SubmissionService extends AbstractService
         $verified = (bool) ($parsed['verified'] ?? false);
         $message = trim((string) ($parsed['message'] ?? ($rawResult['error_message'] ?? '')));
         if ($message === '') {
-            $message = $status !== '' ? $status : 'OCR verification completed.';
+            $message = $status !== '' ? $status : 'ID verification completed successfully.';
         }
 
         $normalized = [
@@ -684,7 +683,7 @@ final class SubmissionService extends AbstractService
 
         if ($normalized['success'] !== true && ($normalized['status_code'] === 0 || $normalized['status_code'] >= 500)) {
             throw new AppException(
-                $normalized['message'] !== '' ? $normalized['message'] : 'OCR verification service is temporarily unavailable.',
+                $normalized['message'] !== '' ? $normalized['message'] : 'ID verification service is temporarily unavailable.',
                 503,
                 'OCR_SERVICE_UNAVAILABLE',
                 [
@@ -705,7 +704,7 @@ final class SubmissionService extends AbstractService
     {
         $primaryDocument = $this->documentForType($attachedDocuments, 'IC_FRONT') ?? ($attachedDocuments[0] ?? null);
         if (!is_array($primaryDocument) || $primaryDocument === [] || !isset($primaryDocument['id'])) {
-            throw new AppException('OCR verification could not be attached to a document.', 500, 'OCR_DOCUMENT_ATTACHMENT_FAILED');
+            throw new AppException('ID verification could not be attached to a document.', 500, 'OCR_DOCUMENT_ATTACHMENT_FAILED');
         }
 
         $status = (string) ($ocrVerification['status'] ?? '');
