@@ -54,6 +54,10 @@ final class MigrationManager
                 continue;
             }
 
+            if (preg_match('/^\d{8}_/', $fileInfo->getFilename()) !== 1) {
+                continue;
+            }
+
             $files[] = $fileInfo->getPathname();
         }
 

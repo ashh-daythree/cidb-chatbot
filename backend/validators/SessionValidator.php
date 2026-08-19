@@ -20,6 +20,8 @@ final class SessionValidator extends AbstractValidator
         'awaiting_company_director_name',
         'awaiting_company_director_ic',
         'awaiting_company_reason',
+        'awaiting_faq_topic',
+        'awaiting_faq_subtopic',
         'submitted',
         'under_review',
         'completed',
@@ -44,6 +46,8 @@ final class SessionValidator extends AbstractValidator
         'ask_company_director_name',
         'ask_company_director_ic',
         'ask_company_reason',
+        'ask_faq_topic',
+        'ask_faq_subtopic',
         'done',
     ];
 
@@ -52,7 +56,7 @@ final class SessionValidator extends AbstractValidator
      */
     private array $stepTransitions = [
         'ask_lang' => 'ask_state',
-        'ask_service' => ['ask_state', 'ask_company_ppk'],
+        'ask_service' => ['ask_state', 'ask_company_ppk', 'ask_faq_topic'],
         'ask_state' => 'ask_name',
         'ask_name' => 'ask_ic',
         'ask_ic' => 'ask_mobile',
@@ -67,6 +71,8 @@ final class SessionValidator extends AbstractValidator
         'ask_company_reason' => 'ask_ic_copy',
         'ask_ic_copy' => 'done',
         'done' => 'done',
+        'ask_faq_topic' => ['ask_faq_subtopic', 'ask_state', 'ask_company_ppk', 'ask_faq_topic'],
+        'ask_faq_subtopic' => ['ask_faq_subtopic', 'ask_state', 'ask_company_ppk', 'ask_faq_topic'],
     ];
 
     public function validate(mixed $input): ValidationResult
