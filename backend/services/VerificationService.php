@@ -190,7 +190,6 @@ final class VerificationService extends AbstractService
     private function buildBotPayload(string $requestId, array $request, array $context): array
     {
         $session = is_array($context['session'] ?? null) ? $context['session'] : [];
-        $documents = is_array($context['documents'] ?? null) ? $context['documents'] : [];
         $applicant = is_array($context['applicant'] ?? null) ? $context['applicant'] : [];
         $draft = is_array($session['draft_payload'] ?? null) ? $session['draft_payload'] : [];
         $identificationNumber = $this->resolveIdentificationNumber($context, $applicant);
@@ -198,70 +197,31 @@ final class VerificationService extends AbstractService
             'company' => 'CIDB',
             'scenario_key' => 'cidb_masterbot',
             'channel' => 'Chatbot',
-            'request_id' => $requestId,
-            'request_number' => $request['request_number'] ?? null,
-            'session_id' => $request['session_id'] ?? null,
-            'workflow_id' => $request['workflow_id'] ?? null,
-            'language_code' => $request['submission_language_code'] ?? ($session['language_code'] ?? null),
-            'state_code' => $applicant['state_code'] ?? ($draft['state_code'] ?? null),
-            'state_name' => $draft['state_name'] ?? ($context['state']['state'] ?? null),
-            'full_name' => $context['full_name']['full_name'] ?? ($applicant['full_name'] ?? null),
-            'identity_type' => $applicant['identity_type'] ?? ($context['identity_number']['identity_type'] ?? null),
-            'identity_number' => $identificationNumber,
-            'sCustomerName' => $this->resolveBotPayloadValue([
-                $context['full_name']['full_name'] ?? null,
-                $applicant['full_name'] ?? null,
-            ]),
-            'sLanguage' => $this->resolveBotPayloadValue([
-                $request['submission_language_code'] ?? null,
-                $session['language_code'] ?? null,
-                $draft['language_code'] ?? null,
-            ]),
-            'sContactNumber' => $this->resolveBotPayloadValue([
-                $draft['mobile'] ?? null,
-                $context['mobile']['mobile'] ?? null,
-            ]),
-            'sLocationArea' => $this->resolveBotPayloadValue([
-                $draft['state_name'] ?? null,
-                $context['state']['state'] ?? null,
-            ]),
             'fields' => [
-                'sIdentificationNumber' => $identificationNumber,
+                'sCustomerType' => 'Individual',
                 'sCustomerName' => $this->resolveBotPayloadValue([
                     $context['full_name']['full_name'] ?? null,
                     $applicant['full_name'] ?? null,
+                ]),
+                'sIdentificationNumber' => $identificationNumber,
+                'sContactNumber' => $this->resolveBotPayloadValue([
+                    $draft['mobile'] ?? null,
+                    $context['mobile']['mobile'] ?? null,
+                ]),
+                'sEmail' => $this->resolveBotPayloadValue([
+                    $draft['email'] ?? null,
+                    $context['email']['email'] ?? null,
+                ]),
+                'sLocationArea' => $this->resolveBotPayloadValue([
+                    $draft['state_name'] ?? null,
+                    $context['state']['state'] ?? null,
                 ]),
                 'sLanguage' => $this->resolveBotPayloadValue([
                     $request['submission_language_code'] ?? null,
                     $session['language_code'] ?? null,
                     $draft['language_code'] ?? null,
                 ]),
-                'sContactNumber' => $this->resolveBotPayloadValue([
-                    $draft['mobile'] ?? null,
-                    $context['mobile']['mobile'] ?? null,
-                ]),
-                'sLocationArea' => $this->resolveBotPayloadValue([
-                    $draft['state_name'] ?? null,
-                    $context['state']['state'] ?? null,
-                ]),
             ],
-            'documents' => array_values(array_filter(array_map(static function (mixed $document): array {
-                if (!is_array($document)) {
-                    return [];
-                }
-
-                return [
-                    'document_id' => $document['id'] ?? null,
-                    'document_type_code' => $document['document_type_code'] ?? null,
-                    'storage_path' => $document['storage_path'] ?? null,
-                    'storage_file_name' => $document['storage_file_name'] ?? null,
-                    'mime_type' => $document['mime_type'] ?? null,
-                    'file_extension' => $document['file_extension'] ?? null,
-                    'file_size_bytes' => $document['file_size_bytes'] ?? null,
-                    'sha256_checksum' => $document['sha256_checksum'] ?? null,
-                ];
-            }, $documents), static fn (array $document): bool => $document !== [])),
-            'submitted_at' => $request['submitted_at'] ?? null,
         ];
 
         $this->assertBotPayloadReady($botPayload);
@@ -279,54 +239,34 @@ final class VerificationService extends AbstractService
         $session = is_array($context['session'] ?? null) ? $context['session'] : [];
         $draft = is_array($session['draft_payload'] ?? null) ? $session['draft_payload'] : [];
         $company = is_array($context['company'] ?? null) ? $context['company'] : [];
-        $director = is_array($context['director'] ?? null) ? $context['director'] : [];
-        $languageCode = $request['submission_language_code'] ?? ($session['language_code'] ?? null);
-        $category = $company['category'] ?? ($company['company_category'] ?? null);
 
         $payload = [
             'company' => 'CIDB',
-            'scenario_key' => 'cidb_company_email_id_cancellation',
+            'scenario_key' => 'cidb_masterbot',
             'channel' => 'Chatbot',
-            'request_id' => $requestId,
-            'request_number' => $request['request_number'] ?? null,
-            'session_id' => $request['session_id'] ?? null,
-            'workflow_id' => $request['workflow_id'] ?? null,
-            'language_code' => $languageCode,
-            'state_code' => $draft['state_code'] ?? null,
-            'state_name' => $draft['state_name'] ?? null,
-            'company_ppk_number' => $company['ppk_number'] ?? null,
-            'company_name' => $company['company_name'] ?? null,
-            'company_email' => $company['company_email'] ?? null,
-            'category' => $category,
-            'company_category' => $category,
-            'director_full_name' => $director['full_name'] ?? null,
-            'director_identity_type' => $director['identity_type'] ?? null,
-            'director_identity_number' => $director['identity_number'] ?? null,
-            'cancellation_reason' => $context['reason']['company_cancellation_reason'] ?? null,
             'fields' => [
-                'ppk_number' => $company['ppk_number'] ?? null,
-                'name' => $company['company_name'] ?? null,
-                'email' => $company['company_email'] ?? null,
-                'category' => $category,
-                'language' => $languageCode,
+                'sCustomerType' => 'Company',
+                'sCompanyName' => $company['company_name'] ?? null,
+                'sSSMNumber' => $company['ppk_number'] ?? null,
+                'sContactNumber' => $this->resolveBotPayloadValue([
+                    $draft['mobile'] ?? null,
+                    $context['mobile']['mobile'] ?? null,
+                ]),
+                'sEmail' => $this->resolveBotPayloadValue([
+                    $company['company_email'] ?? null,
+                    $draft['company_email'] ?? null,
+                    $context['email']['email'] ?? null,
+                ]),
+                'sLocationArea' => $this->resolveBotPayloadValue([
+                    $draft['state_name'] ?? null,
+                    $context['state']['state'] ?? null,
+                ]),
+                'sLanguage' => $this->resolveBotPayloadValue([
+                    $request['submission_language_code'] ?? null,
+                    $session['language_code'] ?? null,
+                    $draft['language_code'] ?? null,
+                ]),
             ],
-            'documents' => array_values(array_filter(array_map(static function (mixed $document): array {
-                if (!is_array($document)) {
-                    return [];
-                }
-
-                return [
-                    'document_id' => $document['id'] ?? null,
-                    'document_type_code' => $document['document_type_code'] ?? null,
-                    'storage_path' => $document['storage_path'] ?? null,
-                    'storage_file_name' => $document['storage_file_name'] ?? null,
-                    'mime_type' => $document['mime_type'] ?? null,
-                    'file_extension' => $document['file_extension'] ?? null,
-                    'file_size_bytes' => $document['file_size_bytes'] ?? null,
-                    'sha256_checksum' => $document['sha256_checksum'] ?? null,
-                ];
-            }, is_array($context['documents'] ?? null) ? $context['documents'] : []), static fn (array $document): bool => $document !== [])),
-            'submitted_at' => $request['submitted_at'] ?? null,
         ];
 
         $this->assertCompanyBotPayloadReady($payload);
@@ -383,15 +323,19 @@ final class VerificationService extends AbstractService
      */
     private function assertBotPayloadReady(array $botPayload): void
     {
+        $fields = is_array($botPayload['fields'] ?? null) ? $botPayload['fields'] : [];
         $missing = [];
 
         foreach ([
+            'sCustomerType',
             'sCustomerName',
-            'sLanguage',
+            'sIdentificationNumber',
             'sContactNumber',
+            'sEmail',
             'sLocationArea',
+            'sLanguage',
         ] as $field) {
-            $value = $botPayload[$field] ?? null;
+            $value = $fields[$field] ?? null;
             if (!is_string($value) || trim($value) === '') {
                 $missing[] = $field;
             }
@@ -400,6 +344,41 @@ final class VerificationService extends AbstractService
         if ($missing !== []) {
             throw new AppException(
                 'RPA payload is missing required field(s).',
+                422,
+                'RPA_PAYLOAD_INVALID',
+                [
+                    'missing_fields' => $missing,
+                ]
+            );
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $botPayload
+     */
+    private function assertCompanyBotPayloadReady(array $botPayload): void
+    {
+        $fields = is_array($botPayload['fields'] ?? null) ? $botPayload['fields'] : [];
+        $missing = [];
+
+        foreach ([
+            'sCustomerType',
+            'sCompanyName',
+            'sSSMNumber',
+            'sContactNumber',
+            'sEmail',
+            'sLocationArea',
+            'sLanguage',
+        ] as $field) {
+            $value = $fields[$field] ?? null;
+            if (!is_string($value) || trim($value) === '') {
+                $missing[] = $field;
+            }
+        }
+
+        if ($missing !== []) {
+            throw new AppException(
+                'Company RPA payload is missing required field(s).',
                 422,
                 'RPA_PAYLOAD_INVALID',
                 [
@@ -637,38 +616,6 @@ final class VerificationService extends AbstractService
         }
 
         return 'failed';
-    }
-
-    /**
-     * @param array<string, mixed> $botPayload
-     */
-    private function assertCompanyBotPayloadReady(array $botPayload): void
-    {
-        $missing = [];
-
-        foreach ([
-            'company_ppk_number',
-            'company_name',
-            'company_email',
-            'company_category',
-            'language_code',
-        ] as $field) {
-            $value = $botPayload[$field] ?? null;
-            if (!is_string($value) || trim($value) === '') {
-                $missing[] = $field;
-            }
-        }
-
-        if ($missing !== []) {
-            throw new AppException(
-                'Company RPA payload is missing required field(s).',
-                422,
-                'RPA_PAYLOAD_INVALID',
-                [
-                    'missing_fields' => $missing,
-                ]
-            );
-        }
     }
 
     /**
