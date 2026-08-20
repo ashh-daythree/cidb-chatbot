@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace Cidb\Backend\Services;
 
 use Cidb\Backend\Config\DatabaseConnection;
+use Cidb\Backend\Repositories\ChatbotFaqQuestionRepository;
 use Cidb\Backend\Repositories\ChatbotSessionRepository;
 use Cidb\Backend\Repositories\ChatbotWorkflowRepository;
+use Cidb\Backend\Repositories\ReferenceFaqSubtopicRepository;
 use Cidb\Backend\Repositories\ReferenceLanguageRepository;
 use Cidb\Backend\Utils\JsonHelper;
 use Cidb\Backend\Validators\EmailAddressValidator;
+use Cidb\Backend\Validators\FaqSubtopicValidator;
+use Cidb\Backend\Validators\FaqTopicValidator;
 use Cidb\Backend\Validators\CompanyPpkValidator;
 use Cidb\Backend\Validators\FullNameValidator;
 use Cidb\Backend\Validators\IdentityValidator;
@@ -26,6 +30,8 @@ final class SessionService extends AbstractService
         private readonly ChatbotSessionRepository $sessionRepository,
         private readonly ChatbotWorkflowRepository $workflowRepository,
         private readonly ReferenceLanguageRepository $languageRepository,
+        private readonly ReferenceFaqSubtopicRepository $faqSubtopicRepository,
+        private readonly ChatbotFaqQuestionRepository $faqQuestionRepository,
         private readonly SessionValidator $sessionValidator,
         private readonly LanguageValidator $languageValidator,
         private readonly MalaysianStateValidator $stateValidator,
@@ -34,6 +40,8 @@ final class SessionService extends AbstractService
         private readonly IdentityValidator $identityValidator,
         private readonly MobileNumberValidator $mobileValidator,
         private readonly EmailAddressValidator $emailValidator,
+        private readonly FaqTopicValidator $faqTopicValidator,
+        private readonly FaqSubtopicValidator $faqSubtopicValidator,
         private readonly ApplicantService $applicantService,
         private readonly StatusService $statusService,
         private readonly AuditService $auditService
@@ -128,19 +136,31 @@ final class SessionService extends AbstractService
                 ]);
             }
 
-            $nextStep = $serviceType === 'company' ? 'ask_company_ppk' : 'ask_state';
+            $nextStep = match ($serviceType) {
+                'company' => 'ask_company_ppk',
+                'faq' => 'ask_faq_topic',
+                default => 'ask_state',
+            };
             $this->assertStep($session, 'ask_service', $nextStep);
 
             $draft = $this->decodeDraft($session['draft_payload'] ?? []);
             $draft['service_type'] = $serviceType;
-            $draft['service_label'] = $serviceType === 'company'
-                ? 'Company Email ID Cancellation'
-                : 'Individual Email ID Cancellation';
+            $draft['service_label'] = match ($serviceType) {
+                'company' => 'Company Email ID Cancellation',
+                'faq' => 'FAQ',
+                default => 'Individual Email ID Cancellation',
+            };
             $draft['category'] = $serviceType;
             $draft['company_category'] = $serviceType;
 
+            $nextStatus = match ($serviceType) {
+                'company' => 'awaiting_company_ppk',
+                'faq' => 'awaiting_faq_topic',
+                default => 'awaiting_state',
+            };
+
             $updated = $this->sessionRepository->update($sessionId, [
-                'status' => $serviceType === 'company' ? 'awaiting_company_ppk' : 'awaiting_state',
+                'status' => $nextStatus,
                 'current_step' => $nextStep,
                 'draft_payload' => $this->encodeDraft($draft),
                 'last_activity_at' => $this->now(),
@@ -461,6 +481,86 @@ final class SessionService extends AbstractService
         return $this->saveCompanyDraftField($sessionId, 'ask_company_reason', 'ask_ic_copy', 'awaiting_documents', 'company_cancellation_reason', $reasonInput, 'session_company_reason_saved', 'Company cancellation reason saved.', 'COMPANY_REASON_REQUIRED');
     }
 
+    public function saveFaqTopicSelection(string $sessionId, mixed $topicInput): array
+    {
+        return $this->transactional(function () use ($sessionId, $topicInput): array {
+            $session = $this->requireSession($sessionId);
+            $this->assertStep($session, 'ask_faq_topic', 'ask_faq_subtopic');
+
+            $validated = $this->faqTopicValidator->validate($topicInput);
+            if (!$validated->isValid()) {
+                throw new AppException('FAQ topic validation failed.', 422, 'FAQ_TOPIC_INVALID', $validated->errors());
+            }
+
+            $topicCode = (string) $validated->data()['topic_code'];
+
+            $draft = $this->decodeDraft($session['draft_payload'] ?? []);
+            $draft['faq_topic_code'] = $topicCode;
+            unset($draft['faq_subtopic_code']);
+
+            $updated = $this->sessionRepository->update($sessionId, [
+                'status' => 'awaiting_faq_subtopic',
+                'current_step' => 'ask_faq_subtopic',
+                'draft_payload' => $this->encodeDraft($draft),
+                'last_activity_at' => $this->now(),
+                'updated_at' => $this->now(),
+            ]);
+
+            $this->auditService->record('session_faq_topic_saved', 'FAQ topic selected.', [
+                'session_id' => $sessionId,
+                'topic_code' => $topicCode,
+            ], 'info', $sessionId);
+
+            return [
+                'session' => $updated ?? $session,
+                'subtopics' => $this->faqSubtopicRepository->findActiveSubtopicsByTopic($topicCode),
+            ];
+        });
+    }
+
+    public function saveFaqSubtopicSelection(string $sessionId, mixed $subtopicInput): array
+    {
+        return $this->transactional(function () use ($sessionId, $subtopicInput): array {
+            $session = $this->requireSession($sessionId);
+            $this->assertStep($session, 'ask_faq_subtopic', 'ask_faq_subtopic');
+
+            $validated = $this->faqSubtopicValidator->validate($subtopicInput);
+            if (!$validated->isValid()) {
+                throw new AppException('FAQ subtopic validation failed.', 422, 'FAQ_SUBTOPIC_INVALID', $validated->errors());
+            }
+
+            $subtopicCode = (string) $validated->data()['subtopic_code'];
+            $topicCode = (string) $validated->data()['topic_code'];
+
+            $draft = $this->decodeDraft($session['draft_payload'] ?? []);
+            if (($draft['faq_topic_code'] ?? null) !== $topicCode) {
+                throw new AppException('FAQ subtopic does not belong to the selected topic.', 422, 'FAQ_SUBTOPIC_TOPIC_MISMATCH');
+            }
+            $draft['faq_subtopic_code'] = $subtopicCode;
+
+            $updated = $this->sessionRepository->update($sessionId, [
+                'draft_payload' => $this->encodeDraft($draft),
+                'last_activity_at' => $this->now(),
+                'updated_at' => $this->now(),
+            ]);
+
+            $this->auditService->record('session_faq_subtopic_saved', 'FAQ subtopic selected.', [
+                'session_id' => $sessionId,
+                'subtopic_code' => $subtopicCode,
+            ], 'info', $sessionId);
+
+            $questions = $this->faqQuestionRepository->findTopQuestionsBySubtopic($subtopicCode, 10);
+            $total = $this->faqQuestionRepository->countBySubtopic($subtopicCode);
+
+            return [
+                'session' => $updated ?? $session,
+                'questions' => $questions,
+                'total' => $total,
+                'has_more' => count($questions) < $total,
+            ];
+        });
+    }
+
     public function updateDraft(string $sessionId, array $patch): array
     {
         return $this->transactional(function () use ($sessionId, $patch): array {
@@ -537,6 +637,10 @@ final class SessionService extends AbstractService
 
         if (in_array($normalized, ['2', 'company', 'company email id cancellation'], true)) {
             return 'company';
+        }
+
+        if (in_array($normalized, ['3', 'faq', 'frequently asked questions'], true)) {
+            return 'faq';
         }
 
         return null;

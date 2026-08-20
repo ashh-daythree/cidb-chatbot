@@ -73,6 +73,11 @@ const state = {
   companyDirectorIdentityType: '',
   companyDirectorIdentityNumber: '',
   companyReason: '',
+  faqTopics: [],
+  faqTopicCode: '',
+  faqSubtopics: [],
+  faqSubtopicCode: '',
+  faqQuestionOffset: 0,
   sigDataUrl: null,
   uploads: { front: null, back: null, certificate: null, signature: null },
   files: { front: null, back: null, certificate: null, signature: null },
@@ -732,7 +737,66 @@ function buildServicePayload(text) {
   if (value === '2' || value.includes('company')) {
     return { service_type: 'company' };
   }
+  if (value === '3' || value.includes('faq') || value.includes('soalan lazim')) {
+    return { service_type: 'faq' };
+  }
   return null;
+}
+
+function faqTopicLabel(topic) {
+  return state.en ? (topic.label_en || topic.topic_code) : (topic.label_ms || topic.topic_code);
+}
+
+function faqTopicOptions() {
+  return (state.faqTopics || []).map(faqTopicLabel);
+}
+
+function buildFaqTopicPayload(text) {
+  const value = String(text || '').trim().toLowerCase();
+  const match = (state.faqTopics || []).find(topic =>
+    String(topic.label_en || '').toLowerCase() === value
+    || String(topic.label_ms || '').toLowerCase() === value
+    || String(topic.topic_code || '').toLowerCase() === value);
+  return match ? { topic_code: match.topic_code, topic: match } : null;
+}
+
+function faqSubtopicLabel(subtopic) {
+  return state.en ? (subtopic.label_en || subtopic.subtopic_code) : (subtopic.label_ms || subtopic.subtopic_code);
+}
+
+function faqSubtopicOptions() {
+  return (state.faqSubtopics || []).map(faqSubtopicLabel);
+}
+
+function buildFaqSubtopicPayload(text) {
+  const value = String(text || '').trim().toLowerCase();
+  const match = (state.faqSubtopics || []).find(subtopic =>
+    String(subtopic.label_en || '').toLowerCase() === value
+    || String(subtopic.label_ms || '').toLowerCase() === value
+    || String(subtopic.subtopic_code || '').toLowerCase() === value);
+  return match ? { subtopic_code: match.subtopic_code, subtopic: match } : null;
+}
+
+let faqAnswerIdCounter = 0;
+
+function renderFaqQuestionList(questions) {
+  const itemsHtml = questions.map(question => {
+    faqAnswerIdCounter += 1;
+    const answerId = `faq-answer-${faqAnswerIdCounter}`;
+    const questionText = state.en ? (question.question_en || '') : (question.question_ms || '');
+    const answerText = state.en ? (question.answer_en || '') : (question.answer_ms || '');
+    return `<div class="faq-item">
+      <button type="button" class="faq-question-btn" onclick="toggleFaqAnswer('${answerId}')">${escapeHtml(questionText)}</button>
+      <div class="faq-answer" id="${answerId}">${escapeHtml(answerText)}</div>
+    </div>`;
+  }).join('');
+  return `<div class="faq-list">${itemsHtml}</div>`;
+}
+
+function toggleFaqAnswer(answerId) {
+  const el = document.getElementById(answerId);
+  if (!el) return;
+  el.classList.toggle('open');
 }
 
 function buildStatePayload(text) {
@@ -1120,6 +1184,11 @@ async function bootstrapConversation() {
   state.companyDirectorIdentityType = '';
   state.companyDirectorIdentityNumber = '';
   state.companyReason = '';
+  state.faqTopics = [];
+  state.faqTopicCode = '';
+  state.faqSubtopics = [];
+  state.faqSubtopicCode = '';
+  state.faqQuestionOffset = 0;
   state.sigDataUrl = null;
   state.uploads = { front: null, back: null, certificate: null, signature: null };
   state.files = { front: null, back: null, certificate: null };
@@ -1187,6 +1256,7 @@ async function handleStep(text) {
       setQR([
         state.en ? '1. Individual Email ID Cancellation' : '1. Pembatalan Email ID Individu',
         state.en ? '2. Company Email ID Cancellation' : '2. Pembatalan Email ID Syarikat',
+        state.en ? '3. FAQ' : '3. Soalan Lazim',
       ]);
       setInput(true);
       await refreshSession();
@@ -1208,6 +1278,7 @@ async function handleStep(text) {
       setQR([
         state.en ? '1. Individual Email ID Cancellation' : '1. Pembatalan Email ID Individu',
         state.en ? '2. Company Email ID Cancellation' : '2. Pembatalan Email ID Syarikat',
+        state.en ? '3. FAQ' : '3. Soalan Lazim',
       ]);
       setInput(true);
       return;
@@ -1217,6 +1288,19 @@ async function handleStep(text) {
       const data = extractData(response);
       updateSessionStateFromSession(isPlainObject(data.session) ? data.session : data);
       state.serviceType = payload.service_type;
+      if (payload.service_type === 'faq') {
+        const topicsResponse = await apiRequest('/faq/topics', { method: 'GET' });
+        const topicsData = extractData(topicsResponse);
+        state.faqTopics = Array.isArray(topicsData.topics) ? topicsData.topics : [];
+        state.step = 'ask_faq_topic';
+        await showTyping(450);
+        await addMsg(state.en ? 'Please choose an FAQ topic:' : 'Sila pilih topik Soalan Lazim:');
+        setQR(faqTopicOptions());
+        setInput(true);
+        await refreshSession();
+        return;
+      }
+
       if (payload.service_type === 'company') {
         state.step = 'ask_company_ppk';
         await showTyping(450);
@@ -1243,7 +1327,137 @@ async function handleStep(text) {
       setQR([
         state.en ? '1. Individual Email ID Cancellation' : '1. Pembatalan Email ID Individu',
         state.en ? '2. Company Email ID Cancellation' : '2. Pembatalan Email ID Syarikat',
+        state.en ? '3. FAQ' : '3. Soalan Lazim',
       ]);
+      setInput(true);
+      return;
+    }
+  }
+
+  if (state.step === 'ask_faq_topic') {
+    const backMenuLabel = state.en ? 'Back to menu' : 'Kembali ke menu';
+    if (text.trim() === backMenuLabel) {
+      state.step = 'ask_service';
+      await showTyping(350);
+      await addMsg(state.en ? 'What do you need help with today?' : 'Apakah bantuan yang anda perlukan hari ini?');
+      setQR([
+        state.en ? '1. Individual Email ID Cancellation' : '1. Pembatalan Email ID Individu',
+        state.en ? '2. Company Email ID Cancellation' : '2. Pembatalan Email ID Syarikat',
+        state.en ? '3. FAQ' : '3. Soalan Lazim',
+      ]);
+      setInput(true);
+      return;
+    }
+
+    const payload = buildFaqTopicPayload(text);
+    if (!payload) {
+      await showApiError({ message: 'Invalid FAQ topic selected.', errors: { topic: 'Please choose a listed FAQ topic.' } }, 'Invalid FAQ topic selected.');
+      await addMsg(state.en ? 'Please choose an FAQ topic:' : 'Sila pilih topik Soalan Lazim:');
+      setQR(faqTopicOptions());
+      setInput(true);
+      return;
+    }
+    try {
+      const response = await apiRequest('/session/faq-topic', { method: 'POST', body: { session_id: state.sessionId, topic_code: payload.topic_code } });
+      const data = extractData(response);
+      updateSessionStateFromSession(isPlainObject(data.session) ? data.session : data);
+      state.faqTopicCode = payload.topic_code;
+      state.faqSubtopics = Array.isArray(data.subtopics) ? data.subtopics : [];
+      state.step = 'ask_faq_subtopic';
+      await showTyping(400);
+      await addMsg(state.en
+        ? `Here are the subtopics under <strong>${escapeHtml(faqTopicLabel(payload.topic))}</strong>:`
+        : `Berikut ialah subtopik di bawah <strong>${escapeHtml(faqTopicLabel(payload.topic))}</strong>:`);
+      setQR(faqSubtopicOptions());
+      setInput(true);
+      await refreshSession();
+      return;
+    } catch (error) {
+      await showApiError(error, 'Unable to save FAQ topic selection.');
+      await addMsg(state.en ? 'Please choose an FAQ topic:' : 'Sila pilih topik Soalan Lazim:');
+      setQR(faqTopicOptions());
+      setInput(true);
+      return;
+    }
+  }
+
+  if (state.step === 'ask_faq_subtopic') {
+    const backTopicsLabel = state.en ? 'Back to topics' : 'Kembali ke topik';
+    const backMenuLabel = state.en ? 'Back to menu' : 'Kembali ke menu';
+    const nextLabel = state.en ? 'Next' : 'Seterusnya';
+    const trimmed = text.trim();
+
+    if (trimmed === backMenuLabel) {
+      state.step = 'ask_service';
+      await showTyping(350);
+      await addMsg(state.en ? 'What do you need help with today?' : 'Apakah bantuan yang anda perlukan hari ini?');
+      setQR([
+        state.en ? '1. Individual Email ID Cancellation' : '1. Pembatalan Email ID Individu',
+        state.en ? '2. Company Email ID Cancellation' : '2. Pembatalan Email ID Syarikat',
+        state.en ? '3. FAQ' : '3. Soalan Lazim',
+      ]);
+      setInput(true);
+      return;
+    }
+
+    if (trimmed === backTopicsLabel) {
+      state.step = 'ask_faq_topic';
+      await showTyping(350);
+      await addMsg(state.en ? 'Please choose an FAQ topic:' : 'Sila pilih topik Soalan Lazim:');
+      setQR(faqTopicOptions());
+      setInput(true);
+      return;
+    }
+
+    if (trimmed === nextLabel && state.faqSubtopicCode) {
+      try {
+        const nextOffset = state.faqQuestionOffset + 10;
+        const response = await apiRequest(`/faq/subtopics/${encodeURIComponent(state.faqSubtopicCode)}/questions?offset=${nextOffset}`, { method: 'GET' });
+        const data = extractData(response);
+        const questions = Array.isArray(data.questions) ? data.questions : [];
+        state.faqQuestionOffset = nextOffset;
+        await showTyping(300);
+        await addMsg(renderFaqQuestionList(questions));
+        setQR(data.has_more ? [nextLabel, backTopicsLabel, backMenuLabel] : [backTopicsLabel, backMenuLabel]);
+        setInput(true);
+        return;
+      } catch (error) {
+        await showApiError(error, 'Unable to load more FAQ questions.');
+        setQR([nextLabel, backTopicsLabel, backMenuLabel]);
+        setInput(true);
+        return;
+      }
+    }
+
+    const payload = buildFaqSubtopicPayload(text);
+    if (!payload) {
+      await showApiError({ message: 'Invalid FAQ subtopic selected.', errors: { subtopic: 'Please choose a listed FAQ subtopic.' } }, 'Invalid FAQ subtopic selected.');
+      await addMsg(state.en ? 'Please choose a subtopic:' : 'Sila pilih subtopik:');
+      setQR(faqSubtopicOptions());
+      setInput(true);
+      return;
+    }
+    try {
+      const response = await apiRequest('/session/faq-subtopic', { method: 'POST', body: { session_id: state.sessionId, subtopic_code: payload.subtopic_code } });
+      const data = extractData(response);
+      updateSessionStateFromSession(isPlainObject(data.session) ? data.session : data);
+      state.faqSubtopicCode = payload.subtopic_code;
+      state.faqQuestionOffset = 0;
+      const questions = Array.isArray(data.questions) ? data.questions : [];
+      await showTyping(400);
+      if (questions.length === 0) {
+        await addMsg(state.en ? 'No FAQs are available for this subtopic yet.' : 'Tiada Soalan Lazim tersedia untuk subtopik ini buat masa ini.');
+      } else {
+        await addMsg(renderFaqQuestionList(questions));
+      }
+      setQR(data.has_more ? [nextLabel, backTopicsLabel, backMenuLabel] : [backTopicsLabel, backMenuLabel]);
+      setInput(true);
+      await refreshSession();
+      return;
+    } catch (error) {
+      await showApiError(error, 'Unable to load FAQ questions.');
+      await addMsg(state.en ? 'Please choose a subtopic:' : 'Sila pilih subtopik:');
+      setQR(faqSubtopicOptions());
       setInput(true);
       return;
     }

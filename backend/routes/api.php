@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Cidb\Backend\Controllers\DocumentController;
+use Cidb\Backend\Controllers\FaqController;
 use Cidb\Backend\Controllers\SessionController;
 use Cidb\Backend\Controllers\SignatureController;
 use Cidb\Backend\Controllers\SubmissionController;
@@ -99,10 +100,40 @@ return [
         'action' => 'companyReason',
     ],
     [
+        'method' => 'POST',
+        'path' => '/session/faq-topic',
+        'controller' => SessionController::class,
+        'action' => 'faqTopic',
+    ],
+    [
+        'method' => 'POST',
+        'path' => '/session/faq-subtopic',
+        'controller' => SessionController::class,
+        'action' => 'faqSubtopic',
+    ],
+    [
         'method' => 'GET',
         'path' => '/session/{id}',
         'controller' => SessionController::class,
         'action' => 'show',
+    ],
+    [
+        'method' => 'GET',
+        'path' => '/faq/topics',
+        'controller' => FaqController::class,
+        'action' => 'topics',
+    ],
+    [
+        'method' => 'GET',
+        'path' => '/faq/topics/{topicCode}/subtopics',
+        'controller' => FaqController::class,
+        'action' => 'subtopics',
+    ],
+    [
+        'method' => 'GET',
+        'path' => '/faq/subtopics/{subtopicCode}/questions',
+        'controller' => FaqController::class,
+        'action' => 'questions',
     ],
     [
         'method' => 'POST',

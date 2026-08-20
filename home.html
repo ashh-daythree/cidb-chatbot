@@ -83,6 +83,12 @@
   .quick-replies { display: flex; flex-wrap: wrap; gap: 6px; }
   .qr-btn { background: rgba(255,255,255,0.9); border: 1.5px solid var(--chat-primary); color: var(--chat-primary); border-radius: 16px; padding: 6px 13px; font-size: 12px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
   .qr-btn:hover { background: var(--chat-primary); color: #fff; }
+  .faq-list { display: flex; flex-direction: column; gap: 6px; }
+  .faq-item { border: 1px solid var(--chat-border); border-radius: 8px; overflow: hidden; background: rgba(255,255,255,0.7); }
+  .faq-question-btn { display: block; width: 100%; text-align: left; background: transparent; border: none; padding: 9px 12px; font-size: 13px; font-weight: 600; color: var(--chat-primary); cursor: pointer; }
+  .faq-question-btn:hover { background: var(--chat-primary-soft); }
+  .faq-answer { max-height: 0; overflow: hidden; padding: 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--chat-text); transition: max-height 0.2s ease, padding 0.2s ease; }
+  .faq-answer.open { max-height: 400px; padding: 0 12px 10px; }
   /* Signature pad modal */
   .sig-overlay { display: none; position: fixed; inset: 0; background: var(--chat-overlay); z-index: 999; align-items: flex-end; justify-content: center; padding-bottom: 0; }
   .sig-overlay.open { display: flex; }
