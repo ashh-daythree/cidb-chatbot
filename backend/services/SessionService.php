@@ -12,12 +12,9 @@ use Cidb\Backend\Repositories\ReferenceFaqSubtopicRepository;
 use Cidb\Backend\Repositories\ReferenceLanguageRepository;
 use Cidb\Backend\Utils\JsonHelper;
 use Cidb\Backend\Validators\EmailAddressValidator;
-<<<<<<< HEAD
 use Cidb\Backend\Validators\FaqSubtopicValidator;
 use Cidb\Backend\Validators\FaqTopicValidator;
-=======
 use Cidb\Backend\Validators\CompanyPpkValidator;
->>>>>>> main
 use Cidb\Backend\Validators\FullNameValidator;
 use Cidb\Backend\Validators\IdentityValidator;
 use Cidb\Backend\Validators\LanguageValidator;
