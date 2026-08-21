@@ -170,6 +170,32 @@ final class SessionController extends AbstractController
         ], 'Company email saved.');
     }
 
+    public function companyContact(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+        $mobile = $payload['company_contact_number'] ?? $payload['contact_number'] ?? $payload['mobile'] ?? $payload['mobile_number'] ?? $payload['phone'] ?? $payload['phone_number'] ?? null;
+
+        $session = $this->sessionService->saveCompanyContactNumber($sessionId, $mobile);
+
+        return $this->success([
+            'session' => $session,
+        ], 'Company contact number saved.');
+    }
+
+    public function companyState(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+        $state = $payload['state'] ?? $payload['state_name'] ?? $payload['state_code'] ?? null;
+
+        $session = $this->sessionService->saveCompanyState($sessionId, $state);
+
+        return $this->success([
+            'session' => $session,
+        ], 'Company state saved.');
+    }
+
     public function companyCategory(array $request): array
     {
         $payload = $this->payload($request);

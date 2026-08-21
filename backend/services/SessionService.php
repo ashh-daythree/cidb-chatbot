@@ -361,7 +361,7 @@ final class SessionService extends AbstractService
     {
         return $this->transactional(function () use ($sessionId, $emailInput): array {
             $session = $this->requireSession($sessionId);
-            $this->assertStep($session, 'ask_company_email', 'ask_company_director_name');
+            $this->assertStep($session, 'ask_company_email', 'ask_company_contact');
 
             $validated = $this->emailValidator->validate($emailInput);
             if (!$validated->isValid()) {
@@ -374,8 +374,8 @@ final class SessionService extends AbstractService
             $draft['company_category'] = $draft['category'];
 
             $updated = $this->sessionRepository->update($sessionId, [
-                'status' => 'awaiting_company_director_name',
-                'current_step' => 'ask_company_director_name',
+                'status' => 'awaiting_company_contact',
+                'current_step' => 'ask_company_contact',
                 'draft_payload' => $this->encodeDraft($draft),
                 'last_activity_at' => $this->now(),
                 'updated_at' => $this->now(),
@@ -383,6 +383,68 @@ final class SessionService extends AbstractService
 
             $this->auditService->record('session_company_email_saved', 'Company email address saved.', [
                 'session_id' => $sessionId,
+            ], 'info', $sessionId);
+
+            return $updated ?? $session;
+        });
+    }
+
+    public function saveCompanyContactNumber(string $sessionId, mixed $mobileInput): array
+    {
+        return $this->transactional(function () use ($sessionId, $mobileInput): array {
+            $session = $this->requireSession($sessionId);
+            $this->assertStep($session, 'ask_company_contact', 'ask_company_state');
+
+            $validated = $this->mobileValidator->validate($mobileInput);
+            if (!$validated->isValid()) {
+                throw new AppException('Company contact number validation failed.', 422, 'COMPANY_CONTACT_INVALID', $validated->errors());
+            }
+
+            $draft = $this->decodeDraft($session['draft_payload'] ?? []);
+            $draft['company_contact_number'] = $validated->data()['mobile'] ?? null;
+
+            $updated = $this->sessionRepository->update($sessionId, [
+                'status' => 'awaiting_company_state',
+                'current_step' => 'ask_company_state',
+                'draft_payload' => $this->encodeDraft($draft),
+                'last_activity_at' => $this->now(),
+                'updated_at' => $this->now(),
+            ]);
+
+            $this->auditService->record('session_company_contact_saved', 'Company contact number saved.', [
+                'session_id' => $sessionId,
+            ], 'info', $sessionId);
+
+            return $updated ?? $session;
+        });
+    }
+
+    public function saveCompanyState(string $sessionId, mixed $stateInput): array
+    {
+        return $this->transactional(function () use ($sessionId, $stateInput): array {
+            $session = $this->requireSession($sessionId);
+            $this->assertStep($session, 'ask_company_state', 'ask_company_director_name');
+
+            $validated = $this->stateValidator->validate($stateInput);
+            if (!$validated->isValid()) {
+                throw new AppException('Company state validation failed.', 422, 'COMPANY_STATE_INVALID', $validated->errors());
+            }
+
+            $draft = $this->decodeDraft($session['draft_payload'] ?? []);
+            $draft['state_code'] = $validated->data()['state_code'] ?? null;
+            $draft['state_name'] = $validated->data()['state_name'] ?? null;
+
+            $updated = $this->sessionRepository->update($sessionId, [
+                'status' => 'awaiting_company_director_name',
+                'current_step' => 'ask_company_director_name',
+                'draft_payload' => $this->encodeDraft($draft),
+                'last_activity_at' => $this->now(),
+                'updated_at' => $this->now(),
+            ]);
+
+            $this->auditService->record('session_company_state_saved', 'Company state saved.', [
+                'session_id' => $sessionId,
+                'state_code' => $draft['state_code'] ?? null,
             ], 'info', $sessionId);
 
             return $updated ?? $session;
@@ -531,11 +593,11 @@ final class SessionService extends AbstractService
             return null;
         }
 
-        if (in_array($normalized, ['1', 'individual', 'individual email id cancellation'], true)) {
+        if (in_array($normalized, ['1', 'individual', 'individual email id cancellation', 'pembatalan email id individu'], true)) {
             return 'individual';
         }
 
-        if (in_array($normalized, ['2', 'company', 'company email id cancellation'], true)) {
+        if (in_array($normalized, ['2', 'company', 'company email id cancellation', 'pembatalan email id syarikat'], true)) {
             return 'company';
         }
 

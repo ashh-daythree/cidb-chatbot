@@ -69,6 +69,35 @@ final class RequestService extends AbstractService
         ]) ?? [];
     }
 
+    public function claimCancellationRetry(string $requestId): ?array
+    {
+        return $this->transactional(function () use ($requestId): ?array {
+            $pdo = $this->connection->pdo();
+            $statement = $pdo->prepare(
+                'UPDATE service_requests
+                    SET status = :status,
+                        updated_at = :updated_at
+                  WHERE id = :id
+                    AND status = :expected_status
+              RETURNING *'
+            );
+
+            $statement->execute([
+                'status' => 'under_review',
+                'updated_at' => $this->now(),
+                'id' => $requestId,
+                'expected_status' => 'submitted',
+            ]);
+
+            $request = $statement->fetch(\PDO::FETCH_ASSOC);
+            if ($request === false) {
+                return null;
+            }
+
+            return $request;
+        });
+    }
+
     public function markFinalOutcome(string $requestId, string $status, ?string $outcome): array
     {
         return $this->requestRepository->update($requestId, [

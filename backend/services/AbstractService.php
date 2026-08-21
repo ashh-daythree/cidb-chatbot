@@ -70,5 +70,23 @@ abstract class AbstractService
 
         return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($bytes), 4));
     }
-}
 
+    /**
+     * @param array<int, mixed> $candidates
+     */
+    protected function resolveBotPayloadValue(array $candidates): ?string
+    {
+        foreach ($candidates as $candidate) {
+            if (!is_string($candidate)) {
+                continue;
+            }
+
+            $value = trim($candidate);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+}

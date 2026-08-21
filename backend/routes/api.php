@@ -76,6 +76,18 @@ return [
     ],
     [
         'method' => 'POST',
+        'path' => '/session/company-contact',
+        'controller' => SessionController::class,
+        'action' => 'companyContact',
+    ],
+    [
+        'method' => 'POST',
+        'path' => '/session/company-state',
+        'controller' => SessionController::class,
+        'action' => 'companyState',
+    ],
+    [
+        'method' => 'POST',
         'path' => '/session/company-category',
         'controller' => SessionController::class,
         'action' => 'companyCategory',
@@ -121,6 +133,12 @@ return [
         'path' => '/submission',
         'controller' => SubmissionController::class,
         'action' => 'submit',
+    ],
+    [
+        'method' => 'POST',
+        'path' => '/submission/{id}/retry',
+        'controller' => SubmissionController::class,
+        'action' => 'retry',
     ],
     [
         'method' => 'GET',
