@@ -249,6 +249,28 @@ final class SessionController extends AbstractController
         ], 'Company cancellation reason saved.');
     }
 
+    public function faqTopic(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+        $topic = $payload['topic_code'] ?? $payload['topic'] ?? null;
+
+        $result = $this->sessionService->saveFaqTopicSelection($sessionId, $topic);
+
+        return $this->success($result, 'FAQ topic saved.');
+    }
+
+    public function faqSubtopic(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+        $subtopic = $payload['subtopic_code'] ?? $payload['subtopic'] ?? null;
+
+        $result = $this->sessionService->saveFaqSubtopicSelection($sessionId, $subtopic);
+
+        return $this->success($result, 'FAQ subtopic saved.');
+    }
+
     public function show(array $request): array
     {
         $sessionId = $this->routeParam($request, 'id');
