@@ -59,10 +59,12 @@ const SERVICE_OPTIONS = {
   en: [
     { value: 'individual', label: '1. Individual Email ID Cancellation' },
     { value: 'company', label: '2. Company Email ID Cancellation' },
+    { value: 'faq', label: '3. FAQ' },
   ],
   ms: [
     { value: 'individual', label: '1. Pembatalan Email ID Individu' },
     { value: 'company', label: '2. Pembatalan Email ID Syarikat' },
+    { value: 'faq', label: '3. Soalan Lazim' },
   ],
 };
 
