@@ -28,6 +28,7 @@ const SLOT_DOC_TYPES = { front: 'IC_FRONT', back: 'IC_BACK', certificate: 'SSM_P
 const WAIT_MESSAGE_INTERVAL_MS = 2400;
 const FINAL_VERIFICATION_TIMEOUT_MS = 10 * 60 * 1000;
 const DEBUG_RPA_FLOW = true;
+const SUBMISSION_CONTEXT_STORAGE_KEY = 'cidb_submission_context';
 const WAIT_MESSAGES = {
   en: [
     'Thank you for waiting. We are checking your details now...',
@@ -54,6 +55,19 @@ const DISPLAY_WAIT_MESSAGES = {
   ],
 };
 
+const SERVICE_OPTIONS = {
+  en: [
+    { value: 'individual', label: '1. Individual Email ID Cancellation' },
+    { value: 'company', label: '2. Company Email ID Cancellation' },
+    { value: 'faq', label: '3. FAQ' },
+  ],
+  ms: [
+    { value: 'individual', label: '1. Pembatalan Email ID Individu' },
+    { value: 'company', label: '2. Pembatalan Email ID Syarikat' },
+    { value: 'faq', label: '3. Soalan Lazim' },
+  ],
+};
+
 const state = {
   step: 'booting',
   sessionId: null,
@@ -68,6 +82,7 @@ const state = {
   companyPpkNumber: '',
   companyName: '',
   companyEmail: '',
+  companyContactNumber: '',
   companyCategory: '',
   companyDirectorName: '',
   companyDirectorIdentityType: '',
@@ -83,6 +98,8 @@ const state = {
   files: { front: null, back: null, certificate: null, signature: null },
   submission: null,
   requestNumber: null,
+  retryRequestIdentifier: null,
+  cancellationRetryInFlight: false,
 };
 
 function isCompanyService() {
@@ -185,6 +202,8 @@ let sigDrawing = false;
 let sigHasStrokes = false;
 let sigCanvasReady = false;
 let submissionPollSequence = 0;
+let pendingQuickReplyValue = null;
+let pendingQuickReplyDisplay = null;
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -479,14 +498,89 @@ function setQR(opts) {
   opts.forEach(option => {
     const button = document.createElement('button');
     button.className = 'qr-btn';
-    button.textContent = option;
+    if (isPlainObject(option)) {
+      button.textContent = option.label ?? option.text ?? option.value ?? '';
+      button.dataset.value = String(option.value ?? option.label ?? '');
+    } else {
+      button.textContent = option;
+      button.dataset.value = String(option);
+    }
     button.onclick = () => {
       quickRepliesEl.innerHTML = '';
-      inputEl.value = option;
+      pendingQuickReplyValue = button.dataset.value || null;
+      pendingQuickReplyDisplay = button.textContent || '';
+      inputEl.value = pendingQuickReplyDisplay;
       sendMessage();
     };
     quickRepliesEl.appendChild(button);
   });
+}
+
+function setQuickReplyAction(label, handler) {
+  quickRepliesEl.innerHTML = '';
+  const button = document.createElement('button');
+  button.className = 'qr-btn';
+  button.textContent = label;
+  button.onclick = async () => {
+    if (button.disabled) {
+      return;
+    }
+
+    button.disabled = true;
+    await handler(button);
+  };
+  quickRepliesEl.appendChild(button);
+  return button;
+}
+
+function persistSubmissionContext(identifier) {
+  if (!identifier) {
+    return;
+  }
+
+  try {
+    localStorage.setItem(SUBMISSION_CONTEXT_STORAGE_KEY, JSON.stringify({
+      requestNumber: identifier,
+      sessionId: state.sessionId || null,
+    }));
+  } catch (error) {
+    traceRpaFlow('frontend persistSubmissionContext failed', {
+      identifier,
+      message: error?.message || 'Unknown error',
+    });
+  }
+}
+
+function loadSubmissionContext() {
+  try {
+    const raw = localStorage.getItem(SUBMISSION_CONTEXT_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!isPlainObject(parsed)) {
+      return null;
+    }
+
+    const requestNumber = firstNonEmpty(parsed.requestNumber, parsed.request_number);
+    return requestNumber ? { requestNumber } : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function clearSubmissionContext() {
+  state.retryRequestIdentifier = null;
+  state.cancellationRetryInFlight = false;
+
+  try {
+    localStorage.removeItem(SUBMISSION_CONTEXT_STORAGE_KEY);
+  } catch (error) {
+    traceRpaFlow('frontend clearSubmissionContext failed', {
+      message: error?.message || 'Unknown error',
+    });
+  }
 }
 
 function setUploadLabels(en) {
@@ -556,6 +650,7 @@ function allUploadsComplete() {
         && state.companyName
         && state.companyEmail
         && state.companyCategory
+        && state.stateName
         && state.companyDirectorName
         && state.companyDirectorIdentityNumber
         && state.companyReason
@@ -707,6 +802,180 @@ async function refreshSubmission(identifier) {
   }
 }
 
+async function renderCancellationSubmissionState(data, { fromRetry = false, allowTerminal = false } = {}) {
+  const en = state.en;
+  const request = isPlainObject(data?.request) ? data.request : null;
+  const verification = isPlainObject(data?.verification) ? data.verification : null;
+  const session = isPlainObject(data?.session) ? data.session : null;
+  const requestNumber = resolveSubmissionIdentifier(
+    firstNonEmpty(data?.request_number, data?.requestNumber, extractRequestNumber(request), state.requestNumber),
+    request
+  );
+  const nextAction = firstNonEmpty(data?.next_action, data?.nextAction, 'done').toLowerCase();
+  const finalFailureType = firstNonEmpty(data?.final_failure_type, data?.finalFailureType, null);
+  const message = firstNonEmpty(
+    data?.message,
+    verification?.display_message,
+    verification?.response_message,
+    ''
+  );
+
+  if (requestNumber) {
+    state.requestNumber = requestNumber;
+  }
+
+  if (session) {
+    state.sessionId = firstNonEmpty(session.id, state.sessionId);
+    state.en = String(session.language_code || '').toLowerCase() !== 'ms';
+    updateSessionStateFromSession(session);
+  }
+
+  if (isPlainObject(data?.submission)) {
+    state.submission = data.submission;
+  } else if (request) {
+    state.submission = request;
+  }
+
+  if (data?.retry_available === true || nextAction === 'retry_available') {
+    state.retryRequestIdentifier = requestNumber || state.requestNumber;
+    state.step = 'awaiting_retry';
+    uploadArea.style.display = 'none';
+    setInput(false);
+    if (requestNumber) {
+      persistSubmissionContext(requestNumber);
+    }
+
+    await addMsg(renderBotRichMessage(message || (en
+      ? 'Cancellation attempt 1 was unsuccessful. Click Retry to try again.'
+      : 'Percubaan pertama pembatalan tidak berjaya. Klik Retry untuk mencuba semula.')), 'error');
+    setQuickReplyAction(en ? 'Retry' : 'Retry', async () => {
+      await handleCancellationRetry();
+    });
+    return { handled: true, retry_available: true };
+  }
+
+  if (data?.retry_in_progress === true) {
+    state.step = 'done';
+    uploadArea.style.display = 'none';
+    setInput(false);
+    quickRepliesEl.innerHTML = '';
+    await addMsg(renderBotRichMessage(message || (en
+      ? 'Cancellation retry is already running. Please wait.'
+      : 'Percubaan semula pembatalan sedang berjalan. Sila tunggu.')), 'bot');
+    return { handled: true, retry_in_progress: true };
+  }
+
+  if (nextAction === 'poll') {
+    state.step = 'done';
+    uploadArea.style.display = 'none';
+    quickRepliesEl.innerHTML = '';
+    setInput(false);
+    if (requestNumber) {
+      persistSubmissionContext(requestNumber);
+    }
+
+    const identifier = requestNumber || state.requestNumber;
+    if (!identifier) {
+      return { handled: false, polling: true };
+    }
+
+    const displayWaitSequence = startDisplayMessageWaitSequence(en);
+    try {
+      const resolved = await waitForFinalVerificationMessage(identifier, verification);
+      const resolvedMessage = firstNonEmpty(resolved.message, message, '');
+      if (resolvedMessage) {
+        await addMsg(renderBotRichMessage(resolvedMessage), 'bot');
+      } else {
+        await addMsg(
+          en
+            ? 'Thank you for waiting. We are still processing your request. Please check back shortly.'
+            : 'Terima kasih kerana menunggu. Permintaan anda masih diproses. Sila semak semula sebentar lagi.'
+        );
+      }
+      return { handled: true, polling: true };
+    } finally {
+      displayWaitSequence.stop();
+    }
+  }
+
+  if (allowTerminal && (finalFailureType === 'cancellation' || finalFailureType === 'company_rejected')) {
+    state.step = 'done';
+    uploadArea.style.display = 'none';
+    quickRepliesEl.innerHTML = '';
+    setInput(false);
+    clearSubmissionContext();
+    await addMsg(renderBotRichMessage(message || (en
+      ? 'We are unable to complete the cancellation at this time.'
+      : 'Kami tidak dapat melengkapkan pembatalan pada masa ini.')), 'bot');
+    return { handled: true, terminal: true };
+  }
+
+  if (allowTerminal && nextAction === 'done') {
+    state.step = 'done';
+    uploadArea.style.display = 'none';
+    quickRepliesEl.innerHTML = '';
+    setInput(false);
+    clearSubmissionContext();
+    if (message) {
+      await addMsg(renderBotRichMessage(message), 'bot');
+    }
+    return { handled: true, terminal: true };
+  }
+
+  if (fromRetry && allowTerminal && message) {
+    state.step = 'done';
+    uploadArea.style.display = 'none';
+    quickRepliesEl.innerHTML = '';
+    setInput(false);
+    clearSubmissionContext();
+    await addMsg(renderBotRichMessage(message), 'bot');
+    return { handled: true, terminal: true };
+  }
+
+  return { handled: false };
+}
+
+async function handleCancellationRetry() {
+  if (!state.retryRequestIdentifier || state.cancellationRetryInFlight) {
+    return;
+  }
+
+  state.cancellationRetryInFlight = true;
+  state.step = 'done';
+  setInput(false);
+  quickRepliesEl.innerHTML = '';
+  await addMsg(state.en
+    ? 'Retrying cancellation now...'
+    : 'Sedang cuba semula pembatalan...', 'bot');
+
+  try {
+    const response = await apiRequest(`/submission/${encodeURIComponent(state.retryRequestIdentifier)}/retry`, {
+      method: 'POST',
+      body: { session_id: state.sessionId },
+    });
+    const data = extractData(response);
+    if (await renderCancellationSubmissionState(data, { fromRetry: true, allowTerminal: true })) {
+      return;
+    }
+
+    await addMsg(renderBotRichMessage(firstNonEmpty(data?.message, state.en ? 'Cancellation retry completed.' : 'Percubaan semula pembatalan selesai.')), 'bot');
+  } catch (error) {
+    await showApiError(error, state.en ? 'Cancellation retry failed.' : 'Percubaan semula pembatalan gagal.');
+    state.step = 'awaiting_retry';
+    if (state.retryRequestIdentifier) {
+      setQuickReplyAction(state.en ? 'Retry' : 'Retry', async () => {
+        await handleCancellationRetry();
+      });
+    }
+    return;
+  } finally {
+    state.cancellationRetryInFlight = false;
+  }
+
+  state.step = 'done';
+  setInput(false);
+}
+
 async function startBackendSession() {
   const response = await apiRequest('/session/start', {
     method: 'POST',
@@ -731,16 +1000,20 @@ function buildLanguagePayload(text) {
 
 function buildServicePayload(text) {
   const value = String(text || '').trim().toLowerCase();
-  if (value === '1' || value.includes('individual')) {
+  if (value === '1' || value === 'individual' || value.includes('individual') || value.includes('individu')) {
     return { service_type: 'individual' };
   }
-  if (value === '2' || value.includes('company')) {
+  if (value === '2' || value === 'company' || value.includes('company') || value.includes('syarikat')) {
     return { service_type: 'company' };
   }
   if (value === '3' || value.includes('faq') || value.includes('soalan lazim')) {
     return { service_type: 'faq' };
   }
   return null;
+}
+
+function getServiceQuickReplies() {
+  return state.en ? SERVICE_OPTIONS.en : SERVICE_OPTIONS.ms;
 }
 
 function faqTopicLabel(topic) {
@@ -914,6 +1187,8 @@ function renderSummaryBox() {
       + `<strong>${state.en ? 'PPK / SSM Number' : 'No. PPK / SSM'}:</strong> ${escapeHtml(state.companyPpkNumber)}<br>`
       + `<strong>${state.en ? 'Company Name' : 'Nama Syarikat'}:</strong> ${escapeHtml(state.companyName)}<br>`
       + `<strong>${state.en ? 'Company Email' : 'Emel Syarikat'}:</strong> ${escapeHtml(state.companyEmail)}<br>`
+      + `<strong>${state.en ? 'Company Contact Number' : 'Nombor Telefon Syarikat'}:</strong> ${escapeHtml(state.companyContactNumber)}<br>`
+      + `<strong>${state.en ? 'Company State' : 'Negeri Syarikat'}:</strong> ${escapeHtml(state.stateName)}<br>`
       + `<strong>${state.en ? 'Category' : 'Kategori'}:</strong> ${escapeHtml(state.companyCategory)}<br>`
       + `<strong>${state.en ? 'Director Name' : 'Nama Pengarah'}:</strong> ${escapeHtml(state.companyDirectorName)}<br>`
       + `<strong>${state.en ? 'Director IC' : 'IC Pengarah'}:</strong> ${escapeHtml(state.companyDirectorIdentityNumber)}<br>`
@@ -1139,7 +1414,8 @@ function updateSessionStateFromSession(session) {
       })();
 
   state.languageCode = firstNonEmpty(session.language_code, session.languageCode, state.languageCode);
-  state.stateName = firstNonEmpty(session.state_name, session.stateName, state.stateName);
+  state.stateName = firstNonEmpty(session.state_name, draft.state_name, session.stateName, state.stateName);
+  state.stateCode = firstNonEmpty(session.state_code, draft.state_code, state.stateCode);
   state.name = firstNonEmpty(session.full_name, session.name, state.name);
   state.identityNumber = firstNonEmpty(session.identity_number, session.identityNumber, state.identityNumber);
   state.identityType = firstNonEmpty(session.identity_type, state.identityType);
@@ -1149,6 +1425,7 @@ function updateSessionStateFromSession(session) {
   state.companyPpkNumber = firstNonEmpty(draft.company_ppk_number, state.companyPpkNumber);
   state.companyName = firstNonEmpty(draft.company_name, state.companyName);
   state.companyEmail = firstNonEmpty(draft.company_email, state.companyEmail);
+  state.companyContactNumber = firstNonEmpty(draft.company_contact_number, state.companyContactNumber);
   state.companyCategory = firstNonEmpty(draft.category, draft.company_category, state.companyCategory);
   state.companyDirectorName = firstNonEmpty(draft.director_full_name, state.companyDirectorName);
   state.companyDirectorIdentityType = firstNonEmpty(draft.director_identity_type, state.companyDirectorIdentityType);
@@ -1159,6 +1436,7 @@ function updateSessionStateFromSession(session) {
     state.companyPpkNumber = '';
     state.companyName = '';
     state.companyEmail = '';
+    state.companyContactNumber = '';
     state.companyCategory = '';
     state.companyDirectorName = '';
     state.companyDirectorIdentityType = '';
@@ -1179,6 +1457,7 @@ async function bootstrapConversation() {
   state.companyPpkNumber = '';
   state.companyName = '';
   state.companyEmail = '';
+  state.companyContactNumber = '';
   state.companyCategory = '';
   state.companyDirectorName = '';
   state.companyDirectorIdentityType = '';
@@ -1194,10 +1473,26 @@ async function bootstrapConversation() {
   state.files = { front: null, back: null, certificate: null };
   state.submission = null;
   state.requestNumber = null;
+  state.retryRequestIdentifier = null;
+  state.cancellationRetryInFlight = false;
   setInput(false);
   quickRepliesEl.innerHTML = '';
   uploadArea.style.display = 'none';
   await showTyping(700);
+
+  const savedContext = loadSubmissionContext();
+  if (savedContext?.requestNumber) {
+    const restored = await refreshSubmission(savedContext.requestNumber);
+    if (restored) {
+      const handled = await renderCancellationSubmissionState(restored, { fromRetry: false, allowTerminal: true });
+      if (handled.handled) {
+        return;
+      }
+    }
+
+    clearSubmissionContext();
+  }
+
   try {
     const { session } = await startBackendSession();
     updateSessionStateFromSession(session);
@@ -1218,12 +1513,15 @@ async function bootstrapConversation() {
 }
 
 async function sendMessage() {
-  const text = inputEl.value.trim();
-  if (!text) return;
+  const displayText = inputEl.value.trim();
+  if (!displayText) return;
+  const text = pendingQuickReplyValue || displayText;
+  pendingQuickReplyValue = null;
+  pendingQuickReplyDisplay = null;
   inputEl.value = '';
   quickRepliesEl.innerHTML = '';
   setInput(false);
-  await addMsg(escapeHtml(text), 'user');
+  await addMsg(escapeHtml(displayText), 'user');
   await handleStep(text);
 }
 
@@ -1253,11 +1551,7 @@ async function handleStep(text) {
       await addMsg(state.en ? 'Thank you! My name is <strong>Bena</strong> and I am here to help you today.' : 'Terima kasih! Nama saya <strong>Bena</strong> dan saya di sini untuk membantu anda hari ini.');
       await showTyping(450);
       await addMsg(state.en ? 'What do you need help with today?' : 'Apakah bantuan yang anda perlukan hari ini?');
-      setQR([
-        state.en ? '1. Individual Email ID Cancellation' : '1. Pembatalan Email ID Individu',
-        state.en ? '2. Company Email ID Cancellation' : '2. Pembatalan Email ID Syarikat',
-        state.en ? '3. FAQ' : '3. Soalan Lazim',
-      ]);
+      setQR(getServiceQuickReplies());
       setInput(true);
       await refreshSession();
       return;
@@ -1275,11 +1569,7 @@ async function handleStep(text) {
     if (!payload) {
       await showApiError({ message: 'Invalid service selected.', errors: { service: 'Please choose a supported service.' } }, 'Invalid service selected.');
       await addMsg(state.en ? 'What do you need help with today?' : 'Apakah bantuan yang anda perlukan hari ini?');
-      setQR([
-        state.en ? '1. Individual Email ID Cancellation' : '1. Pembatalan Email ID Individu',
-        state.en ? '2. Company Email ID Cancellation' : '2. Pembatalan Email ID Syarikat',
-        state.en ? '3. FAQ' : '3. Soalan Lazim',
-      ]);
+      setQR(getServiceQuickReplies());
       setInput(true);
       return;
     }
@@ -1324,11 +1614,7 @@ async function handleStep(text) {
     } catch (error) {
       await showApiError(error, 'Unable to save service selection.');
       await addMsg(state.en ? 'What do you need help with today?' : 'Apakah bantuan yang anda perlukan hari ini?');
-      setQR([
-        state.en ? '1. Individual Email ID Cancellation' : '1. Pembatalan Email ID Individu',
-        state.en ? '2. Company Email ID Cancellation' : '2. Pembatalan Email ID Syarikat',
-        state.en ? '3. FAQ' : '3. Soalan Lazim',
-      ]);
+      setQR(getServiceQuickReplies());
       setInput(true);
       return;
     }
@@ -1566,6 +1852,68 @@ async function handleStep(text) {
       updateSessionStateFromSession(isPlainObject(data.session) ? data.session : data);
       state.companyEmail = payload.email;
       state.companyCategory = state.companyCategory || 'company';
+      state.step = 'ask_company_contact';
+      await showTyping(450);
+      await addMsg(state.en
+        ? 'Please provide the <strong>company contact number</strong> so we can continue.'
+        : 'Sila berikan <strong>nombor telefon syarikat</strong> untuk meneruskan.');
+      setInput(true);
+      await refreshSession();
+      return;
+    } catch (error) {
+      await showApiError(error, 'Unable to save company email.');
+      await addMsg(state.en ? 'Please provide the <strong>company email address</strong>.' : 'Sila berikan <strong>alamat emel syarikat</strong>.');
+      setInput(true);
+      return;
+    }
+  }
+
+  if (state.step === 'ask_company_contact') {
+    const payload = buildMobilePayload(text);
+    if (!payload) {
+      await showApiError({ message: 'Invalid company contact number.', errors: { company_contact_number: 'Enter a valid contact number.' } }, 'Invalid company contact number.');
+      await addMsg(state.en ? 'Please provide the <strong>company contact number</strong>.' : 'Sila berikan <strong>nombor telefon syarikat</strong>.');
+      setInput(true);
+      return;
+    }
+    try {
+      const response = await apiRequest('/session/company-contact', { method: 'POST', body: { session_id: state.sessionId, company_contact_number: payload.mobile } });
+      const data = extractData(response);
+      updateSessionStateFromSession(isPlainObject(data.session) ? data.session : data);
+      state.companyContactNumber = payload.mobile;
+      state.step = 'ask_company_state';
+      await showTyping(450);
+      await addMsg(state.en
+        ? 'Please provide the <strong>company state</strong> for RPA verification.'
+        : 'Sila berikan <strong>negeri syarikat</strong> untuk pengesahan RPA.');
+      setQR(MY_STATES);
+      setInput(true);
+      await refreshSession();
+      return;
+    } catch (error) {
+      await showApiError(error, 'Unable to save company contact number.');
+      await addMsg(state.en ? 'Please provide the <strong>company contact number</strong>.' : 'Sila berikan <strong>nombor telefon syarikat</strong>.');
+      setInput(true);
+      return;
+    }
+  }
+
+  if (state.step === 'ask_company_state') {
+    const payload = buildStatePayload(text);
+    if (!payload) {
+      await showApiError({ message: 'Invalid Malaysian state selected.', errors: { state: 'Please choose a valid Malaysian state.' } }, 'Invalid Malaysian state selected.');
+      await addMsg(state.en
+        ? 'Please provide the <strong>company state</strong> for RPA verification.'
+        : 'Sila berikan <strong>negeri syarikat</strong> untuk pengesahan RPA.');
+      setQR(MY_STATES);
+      setInput(true);
+      return;
+    }
+    try {
+      const response = await apiRequest('/session/company-state', { method: 'POST', body: { session_id: state.sessionId, state: payload.state } });
+      const data = extractData(response);
+      updateSessionStateFromSession(isPlainObject(data.session) ? data.session : data);
+      state.stateName = payload.state;
       state.step = 'ask_company_director_name';
       await showTyping(450);
       await addMsg(state.en ? 'What is the <strong>director full name</strong>?' : 'Apakah <strong>nama penuh pengarah</strong>?');
@@ -1573,8 +1921,10 @@ async function handleStep(text) {
       await refreshSession();
       return;
     } catch (error) {
-      await showApiError(error, 'Unable to save company email.');
-      await addMsg(state.en ? 'Please provide the <strong>company email address</strong>.' : 'Sila berikan <strong>alamat emel syarikat</strong>.');
+      await showApiError(error, 'Unable to save company state.');
+      await addMsg(state.en
+        ? 'Please provide the <strong>company state</strong> for RPA verification.'
+        : 'Sila berikan <strong>negeri syarikat</strong> untuk pengesahan RPA.');
       setInput(true);
       return;
     }
@@ -2062,7 +2412,7 @@ async function submitIC() {
   }
 
   if (isCompanyService()) {
-    if (!state.companyPpkNumber || !state.companyName || !state.companyEmail || !state.companyCategory || !state.companyDirectorName || !state.companyDirectorIdentityNumber || !state.companyReason) {
+    if (!state.companyPpkNumber || !state.companyName || !state.companyEmail || !state.companyContactNumber || !state.stateName || !state.companyCategory || !state.companyDirectorName || !state.companyDirectorIdentityNumber || !state.companyReason) {
       await addMsg(en ? 'Please complete the company details before submitting.' : 'Sila lengkapkan butiran syarikat sebelum menghantar.', 'error');
       return;
     }
@@ -2142,7 +2492,11 @@ async function submitIC() {
     const ocrVerification = isPlainObject(data.ocr_verification) ? data.ocr_verification : null;
     const ocrShouldContinue = ocrVerification ? ocrVerification.should_continue !== false : true;
     state.requestNumber = requestNumber;
+    if (requestNumber) {
+      persistSubmissionContext(requestNumber);
+    }
     const verification = isPlainObject(data.verification) ? data.verification : null;
+    const finalFailureType = firstNonEmpty(data.final_failure_type, data.finalFailureType, state.submission?.final_failure_type);
     traceRpaFlow('frontend submit response received', {
       identifier: requestNumber,
       submissionRequestNumber: extractRequestNumber(request),
@@ -2152,6 +2506,21 @@ async function submitIC() {
       displayMessageIsEmpty: !String(verification?.display_message ?? '').trim(),
       resultStatus: verification?.result_status ?? null,
     });
+
+    if (finalFailureType === 'ocr') {
+      ocrWaitSequence.stop();
+      displayWaitSequence?.stop?.();
+      const finalMessage = firstNonEmpty(data.message, ocrVerification?.message, ocrVerification?.display_message, en
+        ? 'We are unable to complete the ID verification after two attempts. Your request has been forwarded for further processing. Please wait for further updates.'
+        : 'Kami tidak dapat melengkapkan pengesahan ID selepas dua percubaan. Permohonan anda telah dihantar untuk tindakan lanjut. Sila tunggu maklum balas seterusnya.');
+      await addMsg(finalMessage, 'bot');
+      uploadArea.style.display = 'none';
+      uploadBtn.disabled = true;
+      state.step = 'done';
+      setInput(false);
+      clearSubmissionContext();
+      return;
+    }
 
     if (nextAction === 'reupload' || (ocrVerification && ocrShouldContinue === false)) {
       ocrWaitSequence.stop();
@@ -2190,6 +2559,14 @@ async function submitIC() {
     }
 
     await addMsg(renderSummaryBox());
+
+    if (data?.retry_available === true || data?.retry_in_progress === true || nextAction === 'retry_available') {
+      const cancellationState = await renderCancellationSubmissionState(data, { fromRetry: false });
+      if (cancellationState.handled) {
+        displayWaitSequence?.stop?.();
+        return;
+      }
+    }
 
     const outcome = firstNonEmpty(
       verification?.result_status,
@@ -2257,6 +2634,7 @@ async function submitIC() {
     }
     state.step = 'done';
     setInput(false);
+    clearSubmissionContext();
   } catch (error) {
     ocrWaitSequence.stop();
     if (displayWaitSequence) {

@@ -1491,10 +1491,20 @@ CREATE TABLE chatbot_sessions (
     CONSTRAINT ck_chatbot_sessions_status CHECK (
         status IN (
             'awaiting_language',
+            'awaiting_service',
             'awaiting_state',
             'awaiting_name',
             'awaiting_identity',
             'awaiting_documents',
+            'awaiting_company_ppk',
+            'awaiting_company_name',
+            'awaiting_company_email',
+            'awaiting_company_contact',
+            'awaiting_company_state',
+            'awaiting_company_category',
+            'awaiting_company_director_name',
+            'awaiting_company_director_ic',
+            'awaiting_company_reason',
             'submitted',
             'under_review',
             'completed',
@@ -1504,7 +1514,26 @@ CREATE TABLE chatbot_sessions (
         )
     ),
     CONSTRAINT ck_chatbot_sessions_current_step CHECK (
-        current_step IN ('ask_lang', 'ask_state', 'ask_name', 'ask_ic', 'ask_ic_copy', 'done')
+        current_step IN (
+            'ask_lang',
+            'ask_service',
+            'ask_state',
+            'ask_name',
+            'ask_ic',
+            'ask_mobile',
+            'ask_email',
+            'ask_ic_copy',
+            'ask_company_ppk',
+            'ask_company_name',
+            'ask_company_email',
+            'ask_company_contact',
+            'ask_company_state',
+            'ask_company_category',
+            'ask_company_director_name',
+            'ask_company_director_ic',
+            'ask_company_reason',
+            'done'
+        )
     ),
     CONSTRAINT ck_chatbot_sessions_draft_payload CHECK (jsonb_typeof(draft_payload) = 'object')
 );
@@ -1573,7 +1602,7 @@ CREATE TABLE service_requests (
             'failed'
         )
     ),
-    CONSTRAINT ck_service_requests_latest_cims_status CHECK (latest_cims_status IN ('pending', 'deleted', 'linked', 'norecord', 'error')),
+    CONSTRAINT ck_service_requests_latest_cims_status CHECK (latest_cims_status IN ('pending', 'deleted', 'linked', 'norecord', 'error', 'approved', 'rejected', 'manual_review')),
     CONSTRAINT ck_service_requests_final_outcome CHECK (final_outcome IS NULL OR final_outcome IN ('deleted', 'linked', 'norecord'))
 );
 
@@ -1659,7 +1688,7 @@ CREATE TABLE cims_verification_results (
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_cims_verification_results_attempt UNIQUE (request_id, attempt_no),
     CONSTRAINT ck_cims_verification_results_attempt_no CHECK (attempt_no > 0),
-    CONSTRAINT ck_cims_verification_results_result_status CHECK (result_status IN ('pending', 'deleted', 'linked', 'norecord', 'error')),
+    CONSTRAINT ck_cims_verification_results_result_status CHECK (result_status IN ('pending', 'deleted', 'linked', 'norecord', 'error', 'approved', 'rejected', 'manual_review')),
     CONSTRAINT ck_cims_verification_results_latency_ms CHECK (latency_ms IS NULL OR latency_ms >= 0),
     CONSTRAINT ck_cims_verification_results_response_payload CHECK (jsonb_typeof(response_payload) = 'object')
 );
@@ -1781,4 +1810,3 @@ This is the approved database contract:
 - `chatbot_audit_logs`
 
 This schema is intentionally compact, normalized, and production-ready for the current frontend flow while staying flexible for future workflows, document types, OCR, AI verification, multiple request types, multiple languages, and additional government integrations.
-

@@ -35,7 +35,7 @@ final class VerificationService extends AbstractService
         ];
     }
 
-    public function verifyCims(string $requestId, ?string $mockOutcome = null, array $context = []): array
+    public function verifyCims(string $requestId, ?string $mockOutcome = null, array $context = [], int $sAttempt = 1): array
     {
         $traceId = $this->uuid();
         $this->logger->debug('RPA trace verifyCims start.', [
@@ -49,13 +49,13 @@ final class VerificationService extends AbstractService
             throw new AppException('Request not found.', 404, 'REQUEST_NOT_FOUND');
         }
 
-        $botPayload = $this->buildBotPayload($requestId, $request, $context);
+        $botPayload = $this->buildBotPayload($requestId, $request, $context, $sAttempt);
         $botResult = $this->rpaBotService->triggerTicketInsert($botPayload);
         $normalized = $this->normalizeBotResult($botResult);
         $isAcknowledgement = (bool) ($normalized['is_acknowledgement'] ?? false);
         $rawBotText = trim((string) ($botResult['raw_response_text'] ?? ''));
 
-        $result = $this->transactional(function () use ($requestId, $context, $normalized, $botResult, $traceId, $rawBotText): array {
+        $result = $this->transactional(function () use ($requestId, $context, $sAttempt, $normalized, $botResult, $traceId, $rawBotText): array {
             $displayMessage = trim((string) ($normalized['display_message'] ?? ''));
             $payload = [
                 'request_id' => $requestId,
@@ -68,7 +68,7 @@ final class VerificationService extends AbstractService
                 'rpa_response_text' => $rawBotText !== '' ? $rawBotText : (string) ($normalized['rpa_response_text'] ?? ''),
                 'display_message' => $displayMessage,
                 'response_payload' => JsonHelper::encode([
-                    'context' => $context,
+                    'context' => array_merge($context, ['sAttempt' => $sAttempt]),
                     'bot_response' => $botResult['parsed_response'] ?? $botResult['raw_response_text'] ?? null,
                 ], true),
                 'verified_at' => $this->now(),
@@ -143,7 +143,7 @@ final class VerificationService extends AbstractService
      * @param array<string, mixed> $context
      * @return array<string, mixed>
      */
-    public function verifyCompanyCancellation(string $requestId, array $context): array
+    public function verifyCompanyCancellation(string $requestId, array $context, int $sAttempt = 1): array
     {
         $traceId = $this->uuid();
         $this->logger->debug('RPA trace verifyCompanyCancellation start.', [
@@ -157,28 +157,129 @@ final class VerificationService extends AbstractService
             throw new AppException('Request not found.', 404, 'REQUEST_NOT_FOUND');
         }
 
-        $botPayload = $this->buildCompanyBotPayload($requestId, $request, $context);
+        $botPayload = $this->buildCompanyBotPayload($requestId, $request, $context, $sAttempt);
         $botResult = $this->rpaBotService->triggerCompanyCancellation($botPayload);
         $normalized = $this->normalizeCompanyBotResult($botResult);
+        $isPending = (bool) ($normalized['is_pending'] ?? false);
+        $rawBotText = trim((string) ($botResult['raw_response_text'] ?? ''));
+
+        $result = $this->transactional(function () use ($requestId, $context, $sAttempt, $normalized, $botResult, $traceId, $rawBotText): array {
+            $displayMessage = trim((string) ($normalized['display_message'] ?? ''));
+            $payload = [
+                'request_id' => $requestId,
+                'attempt_no' => $this->nextAttemptNumber($requestId),
+                'result_status' => $normalized['result_status'],
+                'response_code' => $normalized['response_code'],
+                'response_message' => $normalized['response_message'],
+                'external_reference_no' => $normalized['external_reference_no'],
+                'latency_ms' => $botResult['duration_ms'] ?? null,
+                'rpa_response_text' => $rawBotText !== '' ? $rawBotText : (string) ($normalized['rpa_response_text'] ?? ''),
+                'display_message' => $displayMessage,
+                'response_payload' => JsonHelper::encode([
+                    'context' => array_merge($context, ['sAttempt' => $sAttempt]),
+                    'bot_response' => $botResult['parsed_response'] ?? $botResult['raw_response_text'] ?? null,
+                ], true),
+                'verified_at' => $this->now(),
+                'created_at' => $this->now(),
+            ];
+
+            $inserted = $this->cimsResultRepository->insert($payload);
+
+            $this->logger->debug('RPA trace company verification row inserted.', [
+                'trace_id' => $traceId,
+                'request_id' => $requestId,
+                'verification_id' => $inserted['id'] ?? null,
+                'inserted_at' => $inserted['created_at'] ?? null,
+                'rpa_response_text_length' => strlen((string) ($inserted['rpa_response_text'] ?? '')),
+                'rpa_response_text_is_empty' => trim((string) ($inserted['rpa_response_text'] ?? '')) === '',
+            ]);
+
+            return $inserted;
+        });
 
         $this->logger->debug('RPA trace verifyCompanyCancellation resolved.', [
             'trace_id' => $traceId,
             'request_id' => $requestId,
-            'status' => $normalized['result_status'] ?? null,
+            'status' => $result['result_status'] ?? null,
             'http_status' => $botResult['status_code'] ?? null,
         ]);
 
         $this->auditService->record('company_rpa_verification_completed', 'Company RPA bot verification completed.', [
             'request_id' => $requestId,
-            'status' => $normalized['result_status'] ?? null,
+            'status' => $result['result_status'] ?? null,
             'http_status' => $botResult['status_code'] ?? null,
         ], 'info', null, $requestId, 'integration');
 
-        return array_merge($normalized, [
+        return array_merge($result, [
+            'response_message' => (string) ($result['response_message'] ?? $normalized['response_message']),
+            'display_message' => trim((string) ($result['display_message'] ?? '')),
+            'quick_replies' => [],
+            'bot_response_text' => $rawBotText !== '' ? $rawBotText : (string) ($botResult['raw_response_text'] ?? ''),
+            'bot_response_body' => $result['response_payload'] ?? ($botResult['parsed_response'] ?? null),
             'http_status' => $botResult['status_code'] ?? null,
             'request_payload' => $botPayload,
-            'bot_response_text' => trim((string) ($botResult['raw_response_text'] ?? '')),
-            'bot_response_body' => $botResult['parsed_response'] ?? null,
+            'is_pending' => $isPending,
+            'is_acknowledgement' => (bool) ($normalized['is_acknowledgement'] ?? false),
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $snapshot
+     * @param array<string, mixed> $ocrVerification
+     * @return array<string, mixed>
+     */
+    public function triggerOcrFinalFailure(array $snapshot, array $ocrVerification, int $sAttempt = 0): array
+    {
+        $traceId = $this->uuid();
+        $session = is_array($snapshot['session'] ?? null) ? $snapshot['session'] : [];
+        $sessionId = (string) ($session['id'] ?? '');
+        $serviceType = mb_strtolower(trim((string) ($snapshot['service']['service_type'] ?? 'individual')));
+
+        $this->logger->debug('RPA trace triggerOcrFinalFailure start.', [
+            'trace_id' => $traceId,
+            'session_id' => $sessionId,
+            'service_type' => $serviceType,
+            's_attempt' => $sAttempt,
+            'timestamp' => $this->now(),
+        ]);
+
+        $request = [
+            'submission_language_code' => $session['language_code'] ?? ($snapshot['language']['language'] ?? null),
+        ];
+
+        if ($serviceType === 'company') {
+            $botPayload = $this->buildCompanyBotPayload($sessionId, $request, [
+                'session' => $session,
+                'company' => is_array($snapshot['company'] ?? null) ? $snapshot['company'] : [],
+                'mobile' => is_array($snapshot['mobile'] ?? null) ? $snapshot['mobile'] : [],
+                'email' => is_array($snapshot['email'] ?? null) ? $snapshot['email'] : [],
+                'state' => is_array($snapshot['state'] ?? null) ? $snapshot['state'] : [],
+            ], $sAttempt);
+        } else {
+            $botPayload = $this->buildBotPayload($sessionId, $request, [
+                'session' => $session,
+                'full_name' => is_array($snapshot['full_name'] ?? null) ? $snapshot['full_name'] : [],
+                'identity_number' => is_array($snapshot['identity_number'] ?? null) ? $snapshot['identity_number'] : [],
+                'mobile' => is_array($snapshot['mobile'] ?? null) ? $snapshot['mobile'] : [],
+                'email' => is_array($snapshot['email'] ?? null) ? $snapshot['email'] : [],
+                'state' => is_array($snapshot['state'] ?? null) ? $snapshot['state'] : [],
+                'applicant' => null,
+            ], $sAttempt);
+        }
+
+        $botResult = $this->rpaBotService->triggerTicketInsert($botPayload);
+
+        $this->auditService->record('ocr_final_failure_rpa_triggered', 'OCR final failure RPA triggered.', [
+            'session_id' => $sessionId,
+            'service_type' => $serviceType,
+            's_attempt' => $sAttempt,
+            'http_status' => $botResult['status_code'] ?? null,
+        ], 'warning', $sessionId, null, 'integration');
+
+        return array_merge($botResult, [
+            'request_payload' => $botPayload,
+            'service_type' => $serviceType,
+            'ocr_verification' => $ocrVerification,
         ]);
     }
 
@@ -187,7 +288,7 @@ final class VerificationService extends AbstractService
      * @param array<string, mixed> $context
      * @return array<string, mixed>
      */
-    private function buildBotPayload(string $requestId, array $request, array $context): array
+    private function buildBotPayload(string $requestId, array $request, array $context, int $sAttempt): array
     {
         $session = is_array($context['session'] ?? null) ? $context['session'] : [];
         $applicant = is_array($context['applicant'] ?? null) ? $context['applicant'] : [];
@@ -221,6 +322,7 @@ final class VerificationService extends AbstractService
                     $session['language_code'] ?? null,
                     $draft['language_code'] ?? null,
                 ]),
+                'sAttempt' => (string) $sAttempt,
             ],
         ];
 
@@ -234,7 +336,7 @@ final class VerificationService extends AbstractService
      * @param array<string, mixed> $context
      * @return array<string, mixed>
      */
-    private function buildCompanyBotPayload(string $requestId, array $request, array $context): array
+    private function buildCompanyBotPayload(string $requestId, array $request, array $context, int $sAttempt): array
     {
         $session = is_array($context['session'] ?? null) ? $context['session'] : [];
         $draft = is_array($session['draft_payload'] ?? null) ? $session['draft_payload'] : [];
@@ -249,6 +351,7 @@ final class VerificationService extends AbstractService
                 'sCompanyName' => $company['company_name'] ?? null,
                 'sSSMNumber' => $company['ppk_number'] ?? null,
                 'sContactNumber' => $this->resolveBotPayloadValue([
+                    $draft['company_contact_number'] ?? null,
                     $draft['mobile'] ?? null,
                     $context['mobile']['mobile'] ?? null,
                 ]),
@@ -266,6 +369,7 @@ final class VerificationService extends AbstractService
                     $session['language_code'] ?? null,
                     $draft['language_code'] ?? null,
                 ]),
+                'sAttempt' => (string) $sAttempt,
             ],
         ];
 
@@ -300,25 +404,6 @@ final class VerificationService extends AbstractService
     }
 
     /**
-     * @param array<int, mixed> $candidates
-     */
-    private function resolveBotPayloadValue(array $candidates): ?string
-    {
-        foreach ($candidates as $candidate) {
-            if (!is_string($candidate)) {
-                continue;
-            }
-
-            $value = trim($candidate);
-            if ($value !== '') {
-                return $value;
-            }
-        }
-
-        return null;
-    }
-
-    /**
      * @param array<string, mixed> $botPayload
      */
     private function assertBotPayloadReady(array $botPayload): void
@@ -334,8 +419,16 @@ final class VerificationService extends AbstractService
             'sEmail',
             'sLocationArea',
             'sLanguage',
+            'sAttempt',
         ] as $field) {
             $value = $fields[$field] ?? null;
+            if ($field === 'sAttempt') {
+                if (!is_int($value) && !(is_string($value) && trim($value) !== '' && ctype_digit(trim($value)))) {
+                    $missing[] = $field;
+                }
+                continue;
+            }
+
             if (!is_string($value) || trim($value) === '') {
                 $missing[] = $field;
             }
@@ -369,8 +462,16 @@ final class VerificationService extends AbstractService
             'sEmail',
             'sLocationArea',
             'sLanguage',
+            'sAttempt',
         ] as $field) {
             $value = $fields[$field] ?? null;
+            if ($field === 'sAttempt') {
+                if (!is_int($value) && !(is_string($value) && trim($value) !== '' && ctype_digit(trim($value)))) {
+                    $missing[] = $field;
+                }
+                continue;
+            }
+
             if (!is_string($value) || trim($value) === '') {
                 $missing[] = $field;
             }
@@ -428,16 +529,24 @@ final class VerificationService extends AbstractService
     {
         $rawText = trim((string) ($botResult['raw_response_text'] ?? ''));
         $parsed = is_array($botResult['parsed_response'] ?? null) ? $botResult['parsed_response'] : null;
+        $isAcknowledgement = $this->isAcknowledgementResponse($parsed);
         $responseMessage = $this->extractCompanyResponseMessage($parsed, $rawText, (string) ($botResult['error_message'] ?? ''));
         $resultStatus = $this->extractCompanyResultStatus($parsed, $responseMessage, (int) ($botResult['status_code'] ?? 0), (bool) ($botResult['success'] ?? false));
+        if ($isAcknowledgement) {
+            $resultStatus = 'pending';
+        }
+
+        $displayMessage = $resultStatus === 'pending' ? '' : $responseMessage;
 
         return [
             'result_status' => $resultStatus,
             'response_message' => $responseMessage,
-            'display_message' => $responseMessage,
+            'display_message' => $displayMessage,
             'response_code' => $this->extractResponseCode($parsed, (int) ($botResult['status_code'] ?? 0), $resultStatus),
             'external_reference_no' => $this->extractExternalReference($parsed),
             'rpa_response_text' => $rawText !== '' ? $rawText : $responseMessage,
+            'is_acknowledgement' => $isAcknowledgement,
+            'is_pending' => $resultStatus === 'pending',
         ];
     }
 
@@ -600,7 +709,7 @@ final class VerificationService extends AbstractService
                 return 'pending';
             }
 
-            return 'approved';
+            return 'pending';
         }
 
         if (str_contains($normalizedMessage, 'manual')) {
