@@ -282,6 +282,241 @@ final class SessionService extends AbstractService
         });
     }
 
+    /**
+     * Updates the identity details after a verification failure.
+     *
+     * @param array<string, mixed> $identityInput
+     */
+    public function updateIdentityDetails(string $sessionId, array $identityInput): array
+    {
+        return $this->transactional(function () use ($sessionId, $identityInput): array {
+            $session = $this->requireSession($sessionId);
+            $draft = $this->decodeDraft($session['draft_payload'] ?? []);
+            $serviceType = $this->normalizeServiceType($draft['service_type'] ?? null) ?? 'individual';
+
+            $updatedDraft = $draft;
+
+            if ($serviceType === 'company') {
+                $currentIdentityType = (string) ($draft['director_identity_type'] ?? '');
+                $directorNameValue = $identityInput['director_full_name'] ?? $identityInput['full_name'] ?? $identityInput['name'] ?? null;
+                $directorIdentityValue = $identityInput['director_identity_number'] ?? $identityInput['identity_number'] ?? $identityInput['ic'] ?? $identityInput['passport'] ?? $identityInput['identity'] ?? null;
+
+                $validatedName = $this->fullNameValidator->validate($directorNameValue);
+                if (!$validatedName->isValid()) {
+                    throw new AppException('Director name validation failed.', 422, 'DIRECTOR_NAME_INVALID', $validatedName->errors());
+                }
+
+                $validatedIdentity = $this->identityValidator->validate([
+                    'identity_type' => $identityInput['identity_type'] ?? ($currentIdentityType !== '' ? $currentIdentityType : null),
+                    'identity_number' => $directorIdentityValue,
+                ]);
+                if (!$validatedIdentity->isValid()) {
+                    throw new AppException('Director IC validation failed.', 422, 'DIRECTOR_IDENTITY_INVALID', $validatedIdentity->errors());
+                }
+
+                $updatedDraft['director_full_name'] = $validatedName->data()['full_name'] ?? null;
+                $updatedDraft['director_identity_type'] = $validatedIdentity->data()['identity_type'] ?? ($currentIdentityType !== '' ? $currentIdentityType : null);
+                $updatedDraft['director_identity_number'] = $validatedIdentity->data()['identity_number'] ?? null;
+                $updatedDraft['director_identity_number_compact'] = $validatedIdentity->data()['identity_number_compact'] ?? null;
+            } else {
+                $currentIdentityType = (string) ($draft['identity_type'] ?? '');
+                $fullNameValue = $identityInput['full_name'] ?? $identityInput['name'] ?? null;
+                $identityValue = $identityInput['identity_number'] ?? $identityInput['ic'] ?? $identityInput['passport'] ?? $identityInput['identity'] ?? null;
+
+                $validatedName = $this->fullNameValidator->validate($fullNameValue);
+                if (!$validatedName->isValid()) {
+                    throw new AppException('Name validation failed.', 422, 'FULL_NAME_INVALID', $validatedName->errors());
+                }
+
+                $validatedIdentity = $this->identityValidator->validate([
+                    'identity_type' => $identityInput['identity_type'] ?? ($currentIdentityType !== '' ? $currentIdentityType : null),
+                    'identity_number' => $identityValue,
+                ]);
+                if (!$validatedIdentity->isValid()) {
+                    throw new AppException('Identity validation failed.', 422, 'IDENTITY_INVALID', $validatedIdentity->errors());
+                }
+
+                $updatedDraft['full_name'] = $validatedName->data()['full_name'] ?? null;
+                $updatedDraft['identity_type'] = $validatedIdentity->data()['identity_type'] ?? ($currentIdentityType !== '' ? $currentIdentityType : null);
+                $updatedDraft['identity_number'] = $validatedIdentity->data()['identity_number'] ?? null;
+                $updatedDraft['identity_number_compact'] = $validatedIdentity->data()['identity_number_compact'] ?? null;
+
+                $this->applicantService->updateIdentityFromSession(
+                    $sessionId,
+                    (string) ($updatedDraft['full_name'] ?? ''),
+                    [
+                        'identity_type' => $updatedDraft['identity_type'] ?? null,
+                        'identity_number' => $updatedDraft['identity_number'] ?? null,
+                    ]
+                );
+            }
+
+            $updated = $this->sessionRepository->update($sessionId, [
+                'draft_payload' => $this->encodeDraft($updatedDraft),
+                'last_activity_at' => $this->now(),
+                'updated_at' => $this->now(),
+            ]);
+
+            $this->auditService->record('session_identity_details_updated', 'Identity details updated from failed verification flow.', [
+                'session_id' => $sessionId,
+                'service_type' => $serviceType,
+            ], 'info', $sessionId);
+
+            return $updated ?? $session;
+        });
+    }
+
+    /**
+     * Updates all retry-editable data before resubmission.
+     *
+     * @param array<string, mixed> $input
+     * @return array<string, mixed>
+     */
+    public function updateRetryEditableData(string $sessionId, array $input): array
+    {
+        return $this->transactional(function () use ($sessionId, $input): array {
+            $session = $this->requireSession($sessionId);
+            $draft = $this->decodeDraft($session['draft_payload'] ?? []);
+            $serviceType = $this->normalizeServiceType($draft['service_type'] ?? null) ?? 'individual';
+
+            if ($serviceType === 'company') {
+                $updatedDraft = $draft;
+
+                $stateResult = $this->stateValidator->validate($input['state'] ?? $input['state_name'] ?? null);
+                if (!$stateResult->isValid()) {
+                    throw new AppException('Company state validation failed.', 422, 'COMPANY_STATE_INVALID', $stateResult->errors());
+                }
+
+                $ppkResult = $this->companyPpkValidator->validate($input['company_ppk_number'] ?? $input['ppk_number'] ?? $input['ssm_number'] ?? null, 'company.ppk_number');
+                if (!$ppkResult->isValid()) {
+                    throw new AppException('Company PPK/SSM validation failed.', 422, 'COMPANY_PPK_INVALID', $ppkResult->errors());
+                }
+
+                $companyName = $this->normalizedTextValue($input['company_name'] ?? $input['name'] ?? null);
+                if ($companyName === '') {
+                    throw new AppException('Company name validation failed.', 422, 'COMPANY_NAME_REQUIRED', [
+                        'company_name' => 'This field is required.',
+                    ]);
+                }
+
+                $emailResult = $this->emailValidator->validate($input['company_email'] ?? $input['email'] ?? $input['email_address'] ?? null);
+                if (!$emailResult->isValid()) {
+                    throw new AppException('Company email validation failed.', 422, 'COMPANY_EMAIL_INVALID', $emailResult->errors());
+                }
+
+                $contactResult = $this->mobileValidator->validate($input['company_contact_number'] ?? $input['contact_number'] ?? $input['mobile'] ?? $input['mobile_number'] ?? $input['phone'] ?? $input['phone_number'] ?? null);
+                if (!$contactResult->isValid()) {
+                    throw new AppException('Company contact number validation failed.', 422, 'COMPANY_CONTACT_INVALID', $contactResult->errors());
+                }
+
+                $directorNameResult = $this->fullNameValidator->validate($input['director_full_name'] ?? $input['full_name'] ?? $input['name'] ?? null);
+                if (!$directorNameResult->isValid()) {
+                    throw new AppException('Director name validation failed.', 422, 'DIRECTOR_NAME_INVALID', $directorNameResult->errors());
+                }
+
+                $currentIdentityType = (string) ($draft['director_identity_type'] ?? '');
+                $directorIdentityResult = $this->identityValidator->validate([
+                    'identity_type' => $input['director_identity_type'] ?? $input['identity_type'] ?? ($currentIdentityType !== '' ? $currentIdentityType : null),
+                    'identity_number' => $input['director_identity_number'] ?? $input['identity_number'] ?? $input['ic'] ?? $input['passport'] ?? $input['identity'] ?? null,
+                ]);
+                if (!$directorIdentityResult->isValid()) {
+                    throw new AppException('Director IC validation failed.', 422, 'DIRECTOR_IDENTITY_INVALID', $directorIdentityResult->errors());
+                }
+
+                $reason = $this->normalizedTextValue($input['company_cancellation_reason'] ?? $input['reason'] ?? $input['company_reason'] ?? null);
+                if ($reason === '') {
+                    throw new AppException('Cancellation reason validation failed.', 422, 'COMPANY_REASON_REQUIRED', [
+                        'company_cancellation_reason' => 'This field is required.',
+                    ]);
+                }
+
+                $updatedDraft['state_code'] = $stateResult->data()['state_code'] ?? null;
+                $updatedDraft['state_name'] = $stateResult->data()['state_name'] ?? null;
+                $updatedDraft['company_ppk_number'] = (string) ($ppkResult->data()['ppk_number'] ?? '');
+                $updatedDraft['company_name'] = $companyName;
+                $updatedDraft['company_email'] = (string) ($emailResult->data()['email'] ?? '');
+                $updatedDraft['company_contact_number'] = (string) ($contactResult->data()['mobile'] ?? '');
+                $updatedDraft['director_full_name'] = (string) ($directorNameResult->data()['full_name'] ?? '');
+                $updatedDraft['director_identity_type'] = $directorIdentityResult->data()['identity_type'] ?? ($currentIdentityType !== '' ? $currentIdentityType : null);
+                $updatedDraft['director_identity_number'] = $directorIdentityResult->data()['identity_number'] ?? null;
+                $updatedDraft['director_identity_number_compact'] = $directorIdentityResult->data()['identity_number_compact'] ?? null;
+                $updatedDraft['company_cancellation_reason'] = $reason;
+                $updatedDraft['category'] = (string) ($updatedDraft['category'] ?? $updatedDraft['service_type'] ?? 'company');
+                $updatedDraft['company_category'] = $updatedDraft['category'];
+
+                $updated = $this->sessionRepository->update($sessionId, [
+                    'draft_payload' => $this->encodeDraft($updatedDraft),
+                    'last_activity_at' => $this->now(),
+                    'updated_at' => $this->now(),
+                ]);
+
+                $this->auditService->record('session_retry_edit_saved', 'Company retry data updated.', [
+                    'session_id' => $sessionId,
+                ], 'info', $sessionId);
+
+                return $updated ?? $session;
+            }
+
+            $updatedDraft = $draft;
+
+            $stateResult = $this->stateValidator->validate($input['state'] ?? $input['state_name'] ?? null);
+            if (!$stateResult->isValid()) {
+                throw new AppException('State validation failed.', 422, 'STATE_INVALID', $stateResult->errors());
+            }
+
+            $nameResult = $this->fullNameValidator->validate($input['full_name'] ?? $input['name'] ?? null);
+            if (!$nameResult->isValid()) {
+                throw new AppException('Name validation failed.', 422, 'FULL_NAME_INVALID', $nameResult->errors());
+            }
+
+            $identityType = $input['identity_type'] ?? ($draft['identity_type'] ?? null);
+            $identityResult = $this->identityValidator->validate([
+                'identity_type' => $identityType,
+                'identity_number' => $input['identity_number'] ?? $input['ic'] ?? $input['passport'] ?? $input['identity'] ?? null,
+            ]);
+            if (!$identityResult->isValid()) {
+                throw new AppException('Identity validation failed.', 422, 'IDENTITY_INVALID', $identityResult->errors());
+            }
+
+            $mobileResult = $this->mobileValidator->validate($input['mobile'] ?? $input['mobile_number'] ?? $input['phone'] ?? $input['phone_number'] ?? null);
+            if (!$mobileResult->isValid()) {
+                throw new AppException('Mobile validation failed.', 422, 'MOBILE_INVALID', $mobileResult->errors());
+            }
+
+            $emailResult = $this->emailValidator->validate($input['email'] ?? $input['email_address'] ?? null);
+            if (!$emailResult->isValid()) {
+                throw new AppException('Email validation failed.', 422, 'EMAIL_INVALID', $emailResult->errors());
+            }
+
+            $updatedDraft['state_code'] = $stateResult->data()['state_code'] ?? null;
+            $updatedDraft['state_name'] = $stateResult->data()['state_name'] ?? null;
+            $updatedDraft['full_name'] = $nameResult->data()['full_name'] ?? null;
+            $updatedDraft['identity_type'] = $identityResult->data()['identity_type'] ?? null;
+            $updatedDraft['identity_number'] = $identityResult->data()['identity_number'] ?? null;
+            $updatedDraft['identity_number_compact'] = $identityResult->data()['identity_number_compact'] ?? null;
+            $updatedDraft['mobile'] = $mobileResult->data()['mobile'] ?? null;
+            $updatedDraft['email'] = $emailResult->data()['email'] ?? null;
+
+            $updated = $this->sessionRepository->update($sessionId, [
+                'draft_payload' => $this->encodeDraft($updatedDraft),
+                'last_activity_at' => $this->now(),
+                'updated_at' => $this->now(),
+            ]);
+
+            $applicant = $this->applicantService->finalizeFromSession($sessionId);
+
+            $this->auditService->record('session_retry_edit_saved', 'Individual retry data updated.', [
+                'session_id' => $sessionId,
+                'applicant_id' => $applicant['id'] ?? null,
+            ], 'info', $sessionId);
+
+            return [
+                'session' => $updated ?? $session,
+                'applicant' => $applicant,
+            ];
+        });
+    }
+
     public function saveMobile(string $sessionId, mixed $mobileInput): array
     {
         return $this->transactional(function () use ($sessionId, $mobileInput): array {
