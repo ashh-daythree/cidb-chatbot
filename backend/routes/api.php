@@ -47,6 +47,18 @@ return [
     ],
     [
         'method' => 'POST',
+        'path' => '/session/identity-edit',
+        'controller' => SessionController::class,
+        'action' => 'identityEdit',
+    ],
+    [
+        'method' => 'POST',
+        'path' => '/session/retry-edit',
+        'controller' => SessionController::class,
+        'action' => 'retryEdit',
+    ],
+    [
+        'method' => 'POST',
         'path' => '/session/mobile',
         'controller' => SessionController::class,
         'action' => 'mobile',

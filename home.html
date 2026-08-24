@@ -121,6 +121,220 @@
   .sig-btn-upload:hover { background: #eefbfb; }
   .sig-cancel { font-size: 12px; color: #8ca0a3; text-align: center; cursor: pointer; }
   .sig-cancel:hover { color: var(--chat-primary-dark); }
+  .identity-edit-btn {
+    align-self: flex-start;
+    border: none;
+    background: transparent;
+    color: var(--chat-primary-dark);
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 0 2px;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .identity-edit-btn:hover { color: var(--chat-primary); }
+  .identity-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: var(--chat-overlay);
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+  }
+  .identity-overlay.open { display: flex; }
+  .identity-modal {
+    width: 100%;
+    max-width: 430px;
+    background: #fff;
+    border-radius: 16px;
+    padding: 18px 18px 16px;
+    box-shadow: 0 12px 36px rgba(15, 29, 31, 0.24);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .identity-handle {
+    width: 42px;
+    height: 4px;
+    background: #cbdad9;
+    border-radius: 2px;
+    align-self: center;
+  }
+  .identity-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--chat-primary);
+    text-align: center;
+  }
+  .identity-subtitle {
+    font-size: 12px;
+    color: var(--chat-muted);
+    text-align: center;
+    line-height: 1.45;
+  }
+  .identity-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .identity-field label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--chat-text);
+  }
+  .identity-field input[type="text"] {
+    border: 1px solid var(--chat-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    outline: none;
+    background: rgba(255,255,255,0.96);
+    color: var(--chat-text);
+    transition: border 0.2s, box-shadow 0.2s;
+  }
+  .identity-field input[type="text"]:focus {
+    border-color: var(--chat-primary);
+    box-shadow: 0 0 0 3px var(--chat-primary-soft);
+  }
+  .identity-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .identity-btn-secondary,
+  .identity-btn-primary {
+    flex: 1;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .identity-btn-secondary {
+    background: #eff7f7;
+    color: var(--chat-primary-dark);
+    border: 1px solid #d0e2e1;
+  }
+  .identity-btn-secondary:hover { background: #e4f3f2; }
+  .identity-btn-primary {
+    background: var(--chat-primary);
+    color: #fff;
+    border: none;
+  }
+  .identity-btn-primary:hover:not(:disabled) { background: var(--chat-primary-dark); }
+  .identity-btn-primary:disabled { background: #a7b9bb; cursor: default; }
+  .retry-edit-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1001;
+    background: var(--chat-overlay);
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+  }
+  .retry-edit-overlay.open { display: flex; }
+  .retry-edit-modal {
+    width: 100%;
+    max-width: 470px;
+    max-height: 88vh;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 16px;
+    padding: 18px 18px 16px;
+    box-shadow: 0 12px 36px rgba(15, 29, 31, 0.24);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .retry-edit-handle {
+    width: 42px;
+    height: 4px;
+    background: #cbdad9;
+    border-radius: 2px;
+    align-self: center;
+  }
+  .retry-edit-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--chat-primary);
+    text-align: center;
+  }
+  .retry-edit-subtitle {
+    font-size: 12px;
+    color: var(--chat-muted);
+    text-align: center;
+    line-height: 1.45;
+  }
+  .retry-edit-section {
+    border: 1px solid var(--chat-border);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: rgba(248, 252, 252, 0.9);
+  }
+  .retry-edit-section h4 {
+    font-size: 13px;
+    color: var(--chat-primary-dark);
+    margin: 0;
+  }
+  .retry-edit-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .retry-edit-field label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--chat-text);
+  }
+  .retry-edit-field input[type="text"],
+  .retry-edit-field select {
+    border: 1px solid var(--chat-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    outline: none;
+    background: rgba(255,255,255,0.96);
+    color: var(--chat-text);
+    transition: border 0.2s, box-shadow 0.2s;
+  }
+  .retry-edit-field input[type="text"]:focus,
+  .retry-edit-field select:focus {
+    border-color: var(--chat-primary);
+    box-shadow: 0 0 0 3px var(--chat-primary-soft);
+  }
+  .retry-edit-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 2px;
+  }
+  .retry-edit-btn-secondary,
+  .retry-edit-btn-primary {
+    flex: 1;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .retry-edit-btn-secondary {
+    background: #eff7f7;
+    color: var(--chat-primary-dark);
+    border: 1px solid #d0e2e1;
+  }
+  .retry-edit-btn-secondary:hover { background: #e4f3f2; }
+  .retry-edit-btn-primary {
+    background: var(--chat-primary);
+    color: #fff;
+    border: none;
+  }
+  .retry-edit-btn-primary:hover:not(:disabled) { background: var(--chat-primary-dark); }
+  .retry-edit-btn-primary:disabled { background: #a7b9bb; cursor: default; }
 </style>
 </head>
 <body>
@@ -180,7 +394,10 @@
 <img class="slot-thumb" id="thumb-sig">
 </div>
  
-      </div>
+</div>
+<button type="button" class="identity-edit-btn" id="identityEditBtn" onclick="openIdentityEditModal()" style="display:none">
+Edit Name and IC Number
+</button>
 <button class="upload-btn" id="uploadBtn" onclick="submitIC()" disabled>
         Submit / Hantar
 </button>
@@ -211,6 +428,98 @@
 <button class="sig-btn-upload" id="sigUploadBtn" onclick="document.getElementById('sigFileInput').click()">Upload signature image instead (JPG / PNG)</button>
 <input type="file" id="sigFileInput" accept="image/jpeg,image/jpg,image/png" style="display:none" onchange="sigFileUploaded()">
 <div class="sig-cancel" id="sigCancelLink" onclick="closeSigPad()">Cancel / Batal</div>
+</div>
+</div>
+
+<!-- Identity edit modal -->
+<div class="identity-overlay" id="identityEditOverlay" onclick="closeIdentityEditModal(event)">
+<div class="identity-modal" onclick="event.stopPropagation()">
+<div class="identity-handle"></div>
+<div class="identity-title" id="identityEditTitle">Edit Name and IC Number</div>
+<div class="identity-subtitle" id="identityEditSubtitle">Update only the name and identification number entered previously. Your uploaded documents will stay the same.</div>
+<div class="identity-field">
+<label for="identityEditName" id="identityEditNameLabel">Full Name</label>
+<input type="text" id="identityEditName" autocomplete="name">
+</div>
+<div class="identity-field">
+<label for="identityEditNumber" id="identityEditNumberLabel">IC / Passport Number</label>
+<input type="text" id="identityEditNumber" autocomplete="off">
+</div>
+<div class="identity-actions">
+<button type="button" class="identity-btn-secondary" id="identityEditCancelBtn" onclick="closeIdentityEditModal()">Cancel</button>
+<button type="button" class="identity-btn-primary" id="identityEditSaveBtn" onclick="saveIdentityEdit()">Save</button>
+</div>
+</div>
+</div>
+
+<!-- Retry edit modal -->
+<div class="retry-edit-overlay" id="retryEditOverlay" onclick="closeRetryEditModal(event)">
+<div class="retry-edit-modal" onclick="event.stopPropagation()">
+<div class="retry-edit-handle"></div>
+<div class="retry-edit-title" id="retryEditTitle">Edit Data Before Resubmitting</div>
+<div class="retry-edit-subtitle" id="retryEditSubtitle">Review every detail you entered before the retry is sent again.</div>
+<div class="retry-edit-section" id="retryEditIndividualSection">
+<h4 id="retryEditIndividualHeading">Your details</h4>
+<div class="retry-edit-field">
+<label for="retryEditState" id="retryEditStateLabel">State</label>
+<select id="retryEditState"></select>
+</div>
+<div class="retry-edit-field">
+<label for="retryEditFullName" id="retryEditFullNameLabel">Full Name</label>
+<input type="text" id="retryEditFullName" autocomplete="name">
+</div>
+<div class="retry-edit-field">
+<label for="retryEditIdentityNumber" id="retryEditIdentityNumberLabel">IC / Passport Number</label>
+<input type="text" id="retryEditIdentityNumber" autocomplete="off">
+</div>
+<div class="retry-edit-field">
+<label for="retryEditMobile" id="retryEditMobileLabel">Mobile Number</label>
+<input type="text" id="retryEditMobile" autocomplete="tel">
+</div>
+<div class="retry-edit-field">
+<label for="retryEditEmail" id="retryEditEmailLabel">Email Address</label>
+<input type="text" id="retryEditEmail" autocomplete="email">
+</div>
+</div>
+<div class="retry-edit-section" id="retryEditCompanySection" style="display:none">
+<h4 id="retryEditCompanyHeading">Company details</h4>
+<div class="retry-edit-field">
+<label for="retryEditCompanyState" id="retryEditCompanyStateLabel">State</label>
+<select id="retryEditCompanyState"></select>
+</div>
+<div class="retry-edit-field">
+<label for="retryEditCompanyPpkNumber" id="retryEditCompanyPpkNumberLabel">PPK / SSM Number</label>
+<input type="text" id="retryEditCompanyPpkNumber" autocomplete="off">
+</div>
+<div class="retry-edit-field">
+<label for="retryEditCompanyName" id="retryEditCompanyNameLabel">Company Name</label>
+<input type="text" id="retryEditCompanyName" autocomplete="organization">
+</div>
+<div class="retry-edit-field">
+<label for="retryEditCompanyEmail" id="retryEditCompanyEmailLabel">Company Email</label>
+<input type="text" id="retryEditCompanyEmail" autocomplete="email">
+</div>
+<div class="retry-edit-field">
+<label for="retryEditCompanyContactNumber" id="retryEditCompanyContactNumberLabel">Company Contact Number</label>
+<input type="text" id="retryEditCompanyContactNumber" autocomplete="tel">
+</div>
+<div class="retry-edit-field">
+<label for="retryEditDirectorName" id="retryEditDirectorNameLabel">Director's Full Name</label>
+<input type="text" id="retryEditDirectorName" autocomplete="name">
+</div>
+<div class="retry-edit-field">
+<label for="retryEditDirectorIdentityNumber" id="retryEditDirectorIdentityNumberLabel">Director's IC / Passport Number</label>
+<input type="text" id="retryEditDirectorIdentityNumber" autocomplete="off">
+</div>
+<div class="retry-edit-field">
+<label for="retryEditCompanyReason" id="retryEditCompanyReasonLabel">Reason</label>
+<input type="text" id="retryEditCompanyReason" autocomplete="off">
+</div>
+</div>
+<div class="retry-edit-actions">
+<button type="button" class="retry-edit-btn-secondary" id="retryEditCancelBtn" onclick="closeRetryEditModal()">Cancel</button>
+<button type="button" class="retry-edit-btn-primary" id="retryEditSaveBtn" onclick="saveRetryEdit()">Save and Retry</button>
+</div>
 </div>
 </div>
  

@@ -22,6 +22,34 @@ const sigCanvas = document.getElementById('sigCanvas');
 const sigUploadBtn = document.getElementById('sigUploadBtn');
 const sigFileInput = document.getElementById('sigFileInput');
 const sigSub = document.getElementById('sigSub');
+const identityEditBtn = document.getElementById('identityEditBtn');
+const identityEditOverlay = document.getElementById('identityEditOverlay');
+const identityEditTitle = document.getElementById('identityEditTitle');
+const identityEditSubtitle = document.getElementById('identityEditSubtitle');
+const identityEditNameLabel = document.getElementById('identityEditNameLabel');
+const identityEditNumberLabel = document.getElementById('identityEditNumberLabel');
+const identityEditNameInput = document.getElementById('identityEditName');
+const identityEditNumberInput = document.getElementById('identityEditNumber');
+const identityEditSaveBtn = document.getElementById('identityEditSaveBtn');
+const retryEditOverlay = document.getElementById('retryEditOverlay');
+const retryEditTitle = document.getElementById('retryEditTitle');
+const retryEditSubtitle = document.getElementById('retryEditSubtitle');
+const retryEditSaveBtn = document.getElementById('retryEditSaveBtn');
+const retryEditIndividualSection = document.getElementById('retryEditIndividualSection');
+const retryEditCompanySection = document.getElementById('retryEditCompanySection');
+const retryEditState = document.getElementById('retryEditState');
+const retryEditFullName = document.getElementById('retryEditFullName');
+const retryEditIdentityNumber = document.getElementById('retryEditIdentityNumber');
+const retryEditMobile = document.getElementById('retryEditMobile');
+const retryEditEmail = document.getElementById('retryEditEmail');
+const retryEditCompanyPpkNumber = document.getElementById('retryEditCompanyPpkNumber');
+const retryEditCompanyName = document.getElementById('retryEditCompanyName');
+const retryEditCompanyEmail = document.getElementById('retryEditCompanyEmail');
+const retryEditCompanyContactNumber = document.getElementById('retryEditCompanyContactNumber');
+const retryEditCompanyState = document.getElementById('retryEditCompanyState');
+const retryEditDirectorName = document.getElementById('retryEditDirectorName');
+const retryEditDirectorIdentityNumber = document.getElementById('retryEditDirectorIdentityNumber');
+const retryEditCompanyReason = document.getElementById('retryEditCompanyReason');
 
 const FILE_SLOTS = ['front', 'back', 'certificate'];
 const SLOT_DOC_TYPES = { front: 'IC_FRONT', back: 'IC_BACK', certificate: 'SSM_PPK_CERTIFICATE' };
@@ -100,6 +128,7 @@ const state = {
   requestNumber: null,
   retryRequestIdentifier: null,
   cancellationRetryInFlight: false,
+  identityEditEnabled: false,
 };
 
 function isCompanyService() {
@@ -132,6 +161,407 @@ function getSignatureInstructionLabel(en = state.en) {
 
 function getCertificateDocumentLabel(en = state.en) {
   return en ? 'SSM / PPK Certificate' : 'Sijil SSM / PPK';
+}
+
+function getIdentityEditUi(en = state.en) {
+  if (isCompanyService()) {
+    return en ? {
+      button: 'Edit Name and IC Number',
+      title: 'Edit Director Details',
+      subtitle: 'Only update the director name and identification number previously entered. Uploaded documents will stay unchanged.',
+      nameLabel: "Director's Full Name",
+      numberLabel: "Director's IC / Passport Number",
+    } : {
+      button: 'Sunting Nama dan No. IC',
+      title: 'Sunting Butiran Pengarah',
+      subtitle: 'Kemas kini hanya nama pengarah dan nombor pengenalan yang telah dimasukkan sebelum ini. Dokumen yang dimuat naik kekal sama.',
+      nameLabel: 'Nama Penuh Pengarah',
+      numberLabel: 'Nombor IC / Pasport Pengarah',
+    };
+  }
+
+  return en ? {
+    button: 'Edit Name and IC Number',
+    title: 'Edit Name and IC Number',
+    subtitle: 'Only update the name and identification number previously entered. Uploaded documents will stay unchanged.',
+    nameLabel: 'Full Name',
+    numberLabel: 'IC / Passport Number',
+  } : {
+    button: 'Sunting Nama dan No. IC',
+    title: 'Sunting Nama dan No. IC',
+    subtitle: 'Kemas kini hanya nama dan nombor pengenalan yang telah dimasukkan sebelum ini. Dokumen yang dimuat naik kekal sama.',
+    nameLabel: 'Nama Penuh',
+    numberLabel: 'Nombor IC / Pasport',
+  };
+}
+
+function syncIdentityEditUi() {
+  const ui = getIdentityEditUi(state.en);
+  if (identityEditBtn) identityEditBtn.textContent = ui.button;
+  if (identityEditTitle) identityEditTitle.textContent = ui.title;
+  if (identityEditSubtitle) identityEditSubtitle.textContent = ui.subtitle;
+  if (identityEditNameLabel) identityEditNameLabel.textContent = ui.nameLabel;
+  if (identityEditNumberLabel) identityEditNumberLabel.textContent = ui.numberLabel;
+  if (identityEditSaveBtn) identityEditSaveBtn.textContent = state.en ? 'Save' : 'Simpan';
+}
+
+function updateIdentityEditVisibility() {
+  if (!identityEditBtn) return;
+  identityEditBtn.style.display = state.identityEditEnabled ? 'inline-flex' : 'none';
+}
+
+function getEditableIdentityValues() {
+  if (isCompanyService()) {
+    return {
+      name: firstNonEmpty(state.companyDirectorName),
+      identityNumber: firstNonEmpty(state.companyDirectorIdentityNumber),
+    };
+  }
+
+  return {
+    name: firstNonEmpty(state.name),
+    identityNumber: firstNonEmpty(state.identityNumber),
+  };
+}
+
+function applyEditableIdentityValues(name, identityNumber) {
+  const normalizedName = firstNonEmpty(name);
+  const normalizedIdentityNumber = firstNonEmpty(identityNumber);
+
+  if (isCompanyService()) {
+    state.companyDirectorName = normalizedName;
+    state.companyDirectorIdentityNumber = normalizedIdentityNumber;
+  } else {
+    state.name = normalizedName;
+    state.identityNumber = normalizedIdentityNumber;
+  }
+}
+
+function setIdentityEditLoading(isLoading) {
+  if (!identityEditSaveBtn) return;
+  identityEditSaveBtn.disabled = isLoading;
+  identityEditSaveBtn.textContent = isLoading
+    ? (state.en ? 'Saving...' : 'Menyimpan...')
+    : (state.en ? 'Save' : 'Simpan');
+}
+
+function openIdentityEditModal() {
+  if (!identityEditOverlay) return;
+  syncIdentityEditUi();
+  const values = getEditableIdentityValues();
+  identityEditNameInput.value = values.name || '';
+  identityEditNumberInput.value = values.identityNumber || '';
+  identityEditOverlay.classList.add('open');
+  setTimeout(() => {
+    identityEditNameInput.focus();
+    identityEditNameInput.select();
+  }, 0);
+}
+
+function closeIdentityEditModal(event) {
+  if (event && event.target !== identityEditOverlay) {
+    return;
+  }
+
+  if (!identityEditOverlay) return;
+  identityEditOverlay.classList.remove('open');
+  setIdentityEditLoading(false);
+}
+
+async function saveIdentityEdit() {
+  const name = String(identityEditNameInput?.value || '').trim();
+  const identityNumber = String(identityEditNumberInput?.value || '').trim();
+
+  if (!name || !identityNumber) {
+    await addMsg(state.en
+      ? 'Please fill in both the name and identification number.'
+      : 'Sila lengkapkan kedua-dua nama dan nombor pengenalan.', 'error');
+    return;
+  }
+
+  setIdentityEditLoading(true);
+  try {
+    const payload = isCompanyService()
+      ? {
+          session_id: state.sessionId,
+          director_full_name: name,
+          director_identity_number: identityNumber,
+          identity_type: state.companyDirectorIdentityType || null,
+        }
+      : {
+          session_id: state.sessionId,
+          full_name: name,
+          identity_number: identityNumber,
+          identity_type: state.identityType || null,
+        };
+
+    const response = await apiRequest('/session/identity-edit', {
+      method: 'POST',
+      body: payload,
+    });
+
+    const data = extractData(response);
+    const updatedSession = isPlainObject(data.session) ? data.session : data;
+    updateSessionStateFromSession(updatedSession);
+    applyEditableIdentityValues(name, identityNumber);
+    closeIdentityEditModal();
+    syncIdentityEditUi();
+    updateIdentityEditVisibility();
+    checkAllFilled();
+    await addMsg(state.en
+      ? 'Your name and identification number have been updated. You can submit the documents again when ready.'
+      : 'Nama dan nombor pengenalan anda telah dikemas kini. Anda boleh menghantar dokumen semula apabila bersedia.');
+  } catch (error) {
+    setIdentityEditLoading(false);
+    await showApiError(error, state.en ? 'Unable to update identity details.' : 'Tidak dapat mengemas kini butiran pengenalan.');
+  }
+}
+
+function getRetryEditUi(en = state.en) {
+  if (isCompanyService()) {
+    return en ? {
+      title: 'Edit Data Before Resubmitting',
+      subtitle: 'Review every company detail you entered before the retry is sent again.',
+      saveLabel: 'Save and Retry',
+      cancelLabel: 'Cancel',
+      individualLabel: 'Individual details',
+      companyLabel: 'Company details',
+      stateLabel: 'State',
+      ppkLabel: 'PPK / SSM Number',
+      companyNameLabel: 'Company Name',
+      companyEmailLabel: 'Company Email',
+      companyContactLabel: 'Company Contact Number',
+      directorNameLabel: 'Director\'s Full Name',
+      directorIdentityLabel: 'Director\'s IC / Passport Number',
+      reasonLabel: 'Reason',
+    } : {
+      title: 'Sunting Data Sebelum Hantar Semula',
+      subtitle: 'Semak semula semua butiran syarikat yang telah anda isi sebelum percubaan semula dihantar.',
+      saveLabel: 'Simpan dan Hantar Semula',
+      cancelLabel: 'Batal',
+      individualLabel: 'Butiran individu',
+      companyLabel: 'Butiran syarikat',
+      stateLabel: 'Negeri',
+      ppkLabel: 'Nombor PPK / SSM',
+      companyNameLabel: 'Nama Syarikat',
+      companyEmailLabel: 'Emel Syarikat',
+      companyContactLabel: 'Nombor Telefon Syarikat',
+      directorNameLabel: 'Nama Penuh Pengarah',
+      directorIdentityLabel: 'Nombor IC / Pasport Pengarah',
+      reasonLabel: 'Sebab',
+    };
+  }
+
+  return en ? {
+    title: 'Edit Data Before Resubmitting',
+    subtitle: 'Review every detail you entered before the retry is sent again.',
+    saveLabel: 'Save and Retry',
+    cancelLabel: 'Cancel',
+    individualLabel: 'Your details',
+    stateLabel: 'State',
+    fullNameLabel: 'Full Name',
+    identityLabel: 'IC / Passport Number',
+    mobileLabel: 'Mobile Number',
+    emailLabel: 'Email Address',
+  } : {
+    title: 'Sunting Data Sebelum Hantar Semula',
+    subtitle: 'Semak semula semua butiran yang telah anda isi sebelum percubaan semula dihantar.',
+    saveLabel: 'Simpan dan Hantar Semula',
+    cancelLabel: 'Batal',
+    individualLabel: 'Butiran anda',
+    stateLabel: 'Negeri',
+    fullNameLabel: 'Nama Penuh',
+    identityLabel: 'Nombor IC / Pasport',
+    mobileLabel: 'Nombor Telefon Bimbit',
+    emailLabel: 'Alamat Emel',
+  };
+}
+
+function fillRetryEditStateOptions() {
+  const selects = [retryEditState, retryEditCompanyState].filter(Boolean);
+  selects.forEach(select => {
+    select.innerHTML = '';
+    const blankOption = document.createElement('option');
+    blankOption.value = '';
+    blankOption.textContent = state.en ? 'Select state' : 'Pilih negeri';
+    select.appendChild(blankOption);
+    MY_STATES.forEach(item => {
+      const option = document.createElement('option');
+      option.value = item;
+      option.textContent = item;
+      select.appendChild(option);
+    });
+  });
+}
+
+function syncRetryEditUi() {
+  if (!retryEditOverlay) return;
+  const ui = getRetryEditUi(state.en);
+  if (retryEditTitle) retryEditTitle.textContent = ui.title;
+  if (retryEditSubtitle) retryEditSubtitle.textContent = ui.subtitle;
+  if (retryEditSaveBtn) retryEditSaveBtn.textContent = ui.saveLabel;
+  if (document.getElementById('retryEditCancelBtn')) {
+    document.getElementById('retryEditCancelBtn').textContent = ui.cancelLabel;
+  }
+  if (document.getElementById('retryEditIndividualHeading')) {
+    document.getElementById('retryEditIndividualHeading').textContent = ui.individualLabel;
+  }
+  if (document.getElementById('retryEditCompanyHeading')) {
+    document.getElementById('retryEditCompanyHeading').textContent = ui.companyLabel;
+  }
+
+  const individualSection = retryEditIndividualSection;
+  const companySection = retryEditCompanySection;
+  if (individualSection) individualSection.style.display = isCompanyService() ? 'none' : 'block';
+  if (companySection) companySection.style.display = isCompanyService() ? 'block' : 'none';
+
+  if (!isCompanyService()) {
+    if (document.getElementById('retryEditStateLabel')) document.getElementById('retryEditStateLabel').textContent = ui.stateLabel;
+    if (document.getElementById('retryEditFullNameLabel')) document.getElementById('retryEditFullNameLabel').textContent = ui.fullNameLabel;
+    if (document.getElementById('retryEditIdentityNumberLabel')) document.getElementById('retryEditIdentityNumberLabel').textContent = ui.identityLabel;
+    if (document.getElementById('retryEditMobileLabel')) document.getElementById('retryEditMobileLabel').textContent = ui.mobileLabel;
+    if (document.getElementById('retryEditEmailLabel')) document.getElementById('retryEditEmailLabel').textContent = ui.emailLabel;
+  } else {
+    if (document.getElementById('retryEditCompanyStateLabel')) document.getElementById('retryEditCompanyStateLabel').textContent = ui.stateLabel;
+    if (document.getElementById('retryEditCompanyPpkNumberLabel')) document.getElementById('retryEditCompanyPpkNumberLabel').textContent = ui.ppkLabel;
+    if (document.getElementById('retryEditCompanyNameLabel')) document.getElementById('retryEditCompanyNameLabel').textContent = ui.companyNameLabel;
+    if (document.getElementById('retryEditCompanyEmailLabel')) document.getElementById('retryEditCompanyEmailLabel').textContent = ui.companyEmailLabel;
+    if (document.getElementById('retryEditCompanyContactNumberLabel')) document.getElementById('retryEditCompanyContactNumberLabel').textContent = ui.companyContactLabel;
+    if (document.getElementById('retryEditDirectorNameLabel')) document.getElementById('retryEditDirectorNameLabel').textContent = ui.directorNameLabel;
+    if (document.getElementById('retryEditDirectorIdentityNumberLabel')) document.getElementById('retryEditDirectorIdentityNumberLabel').textContent = ui.directorIdentityLabel;
+    if (document.getElementById('retryEditCompanyReasonLabel')) document.getElementById('retryEditCompanyReasonLabel').textContent = ui.reasonLabel;
+  }
+
+  fillRetryEditStateOptions();
+}
+
+function getRetryEditSnapshot() {
+  if (isCompanyService()) {
+    return {
+      state: firstNonEmpty(state.stateName),
+      company_ppk_number: firstNonEmpty(state.companyPpkNumber),
+      company_name: firstNonEmpty(state.companyName),
+      company_email: firstNonEmpty(state.companyEmail),
+      company_contact_number: firstNonEmpty(state.companyContactNumber),
+      director_full_name: firstNonEmpty(state.companyDirectorName),
+      director_identity_number: firstNonEmpty(state.companyDirectorIdentityNumber),
+      company_cancellation_reason: firstNonEmpty(state.companyReason),
+      director_identity_type: firstNonEmpty(state.companyDirectorIdentityType),
+    };
+  }
+
+  return {
+    state: firstNonEmpty(state.stateName),
+    full_name: firstNonEmpty(state.name),
+    identity_number: firstNonEmpty(state.identityNumber),
+    mobile: firstNonEmpty(state.mobile),
+    email: firstNonEmpty(state.email),
+    identity_type: firstNonEmpty(state.identityType),
+  };
+}
+
+function setRetryEditValues() {
+  const snapshot = getRetryEditSnapshot();
+  if (isCompanyService()) {
+    if (retryEditCompanyState) retryEditCompanyState.value = snapshot.state || '';
+    if (retryEditCompanyPpkNumber) retryEditCompanyPpkNumber.value = snapshot.company_ppk_number || '';
+    if (retryEditCompanyName) retryEditCompanyName.value = snapshot.company_name || '';
+    if (retryEditCompanyEmail) retryEditCompanyEmail.value = snapshot.company_email || '';
+    if (retryEditCompanyContactNumber) retryEditCompanyContactNumber.value = snapshot.company_contact_number || '';
+    if (retryEditDirectorName) retryEditDirectorName.value = snapshot.director_full_name || '';
+    if (retryEditDirectorIdentityNumber) retryEditDirectorIdentityNumber.value = snapshot.director_identity_number || '';
+    if (retryEditCompanyReason) retryEditCompanyReason.value = snapshot.company_cancellation_reason || '';
+  } else {
+    if (retryEditState) retryEditState.value = snapshot.state || '';
+    if (retryEditFullName) retryEditFullName.value = snapshot.full_name || '';
+    if (retryEditIdentityNumber) retryEditIdentityNumber.value = snapshot.identity_number || '';
+    if (retryEditMobile) retryEditMobile.value = snapshot.mobile || '';
+    if (retryEditEmail) retryEditEmail.value = snapshot.email || '';
+  }
+}
+
+function setRetryEditLoading(isLoading) {
+  if (!retryEditSaveBtn) return;
+  retryEditSaveBtn.disabled = isLoading;
+  retryEditSaveBtn.textContent = isLoading
+    ? (state.en ? 'Saving...' : 'Menyimpan...')
+    : getRetryEditUi(state.en).saveLabel;
+}
+
+function openRetryEditModal() {
+  if (!retryEditOverlay) return;
+  syncRetryEditUi();
+  setRetryEditValues();
+  retryEditOverlay.classList.add('open');
+}
+
+function closeRetryEditModal(event) {
+  if (event && event.target !== retryEditOverlay) {
+    return;
+  }
+
+  if (!retryEditOverlay) return;
+  retryEditOverlay.classList.remove('open');
+  setRetryEditLoading(false);
+}
+
+function buildRetryEditPayload() {
+  if (isCompanyService()) {
+    const directorIdentity = buildIdentityPayload(String(retryEditDirectorIdentityNumber?.value || '').trim());
+    return {
+      session_id: state.sessionId,
+      state: String(retryEditCompanyState?.value || '').trim(),
+      company_ppk_number: String(retryEditCompanyPpkNumber?.value || '').trim(),
+      company_name: String(retryEditCompanyName?.value || '').trim(),
+      company_email: String(retryEditCompanyEmail?.value || '').trim(),
+      company_contact_number: String(retryEditCompanyContactNumber?.value || '').trim(),
+      director_full_name: String(retryEditDirectorName?.value || '').trim(),
+      director_identity_number: String(retryEditDirectorIdentityNumber?.value || '').trim(),
+      company_cancellation_reason: String(retryEditCompanyReason?.value || '').trim(),
+      director_identity_type: directorIdentity?.identity_type || state.companyDirectorIdentityType || null,
+    };
+  }
+
+  const identity = buildIdentityPayload(String(retryEditIdentityNumber?.value || '').trim());
+  return {
+    session_id: state.sessionId,
+    state: String(retryEditState?.value || '').trim(),
+    full_name: String(retryEditFullName?.value || '').trim(),
+    identity_number: String(retryEditIdentityNumber?.value || '').trim(),
+    mobile: String(retryEditMobile?.value || '').trim(),
+    email: String(retryEditEmail?.value || '').trim(),
+    identity_type: identity?.identity_type || state.identityType || null,
+  };
+}
+
+async function saveRetryEdit() {
+  if (!state.sessionId) {
+    return;
+  }
+
+  setRetryEditLoading(true);
+  try {
+    const response = await apiRequest('/session/retry-edit', {
+      method: 'POST',
+      body: buildRetryEditPayload(),
+    });
+
+    const data = extractData(response);
+    if (isPlainObject(data.session)) {
+      updateSessionStateFromSession(data.session);
+    } else if (isPlainObject(data)) {
+      updateSessionStateFromSession(data.session || data);
+    }
+
+    closeRetryEditModal();
+    await addMsg(state.en
+      ? 'Your updated details have been saved. Resubmitting now...'
+      : 'Butiran yang dikemas kini telah disimpan. Sedang menghantar semula...');
+    await handleCancellationRetry();
+  } catch (error) {
+    setRetryEditLoading(false);
+    await showApiError(error, state.en ? 'Unable to update retry data.' : 'Tidak dapat mengemas kini data percubaan semula.');
+  }
 }
 
 function syncUploadPanelBranch() {
@@ -533,6 +963,28 @@ function setQuickReplyAction(label, handler) {
   return button;
 }
 
+function setQuickReplyActions(actions) {
+  quickRepliesEl.innerHTML = '';
+  actions.forEach(action => {
+    const button = document.createElement('button');
+    button.className = 'qr-btn';
+    button.textContent = action.label;
+    button.onclick = async () => {
+      if (button.disabled) {
+        return;
+      }
+
+      button.disabled = true;
+      try {
+        await action.handler(button);
+      } finally {
+        button.disabled = false;
+      }
+    };
+    quickRepliesEl.appendChild(button);
+  });
+}
+
 function persistSubmissionContext(identifier) {
   if (!identifier) {
     return;
@@ -605,6 +1057,8 @@ function setUploadLabels(en) {
   }
   document.getElementById('uploadBtn').textContent = en ? 'Submit' : 'Hantar';
   syncUploadPanelBranch();
+  syncIdentityEditUi();
+  updateIdentityEditVisibility();
 }
 
 function resetUploadSlot(slotId) {
@@ -848,9 +1302,20 @@ async function renderCancellationSubmissionState(data, { fromRetry = false, allo
     await addMsg(renderBotRichMessage(message || (en
       ? 'Cancellation attempt 1 was unsuccessful. Click Retry to try again.'
       : 'Percubaan pertama pembatalan tidak berjaya. Klik Retry untuk mencuba semula.')), 'error');
-    setQuickReplyAction(en ? 'Retry' : 'Retry', async () => {
-      await handleCancellationRetry();
-    });
+    setQuickReplyActions([
+      {
+        label: en ? 'Retry' : 'Retry',
+        handler: async () => {
+          await handleCancellationRetry();
+        },
+      },
+      {
+        label: en ? 'Edit Data Before Resubmitting' : 'Sunting Data Sebelum Hantar Semula',
+        handler: async () => {
+          openRetryEditModal();
+        },
+      },
+    ]);
     return { handled: true, retry_available: true };
   }
 
@@ -963,9 +1428,20 @@ async function handleCancellationRetry() {
     await showApiError(error, state.en ? 'Cancellation retry failed.' : 'Percubaan semula pembatalan gagal.');
     state.step = 'awaiting_retry';
     if (state.retryRequestIdentifier) {
-      setQuickReplyAction(state.en ? 'Retry' : 'Retry', async () => {
-        await handleCancellationRetry();
-      });
+      setQuickReplyActions([
+        {
+          label: state.en ? 'Retry' : 'Retry',
+          handler: async () => {
+            await handleCancellationRetry();
+          },
+        },
+        {
+          label: state.en ? 'Edit Data Before Resubmitting' : 'Sunting Data Sebelum Hantar Semula',
+          handler: async () => {
+            openRetryEditModal();
+          },
+        },
+      ]);
     }
     return;
   } finally {
@@ -1445,6 +1921,9 @@ function updateSessionStateFromSession(session) {
   }
 
   syncUploadPanelBranch();
+  syncIdentityEditUi();
+  syncRetryEditUi();
+  updateIdentityEditVisibility();
 }
 
 async function bootstrapConversation() {
@@ -1475,6 +1954,10 @@ async function bootstrapConversation() {
   state.requestNumber = null;
   state.retryRequestIdentifier = null;
   state.cancellationRetryInFlight = false;
+  state.identityEditEnabled = false;
+  updateIdentityEditVisibility();
+  closeIdentityEditModal();
+  closeRetryEditModal();
   setInput(false);
   quickRepliesEl.innerHTML = '';
   uploadArea.style.display = 'none';
@@ -2007,6 +2490,7 @@ async function handleStep(text) {
         ? 'Thank you. Please upload the director <strong>IC front</strong>, <strong>IC back</strong>, and the <strong>SSM / PPK certificate</strong>.'
         : 'Terima kasih. Sila muat naik <strong>IC depan</strong>, <strong>IC belakang</strong>, dan <strong>sijil SSM / PPK</strong> pengarah.');
       setUploadLabels(state.en);
+      state.identityEditEnabled = false;
       state.sigDataUrl = null;
       state.uploads = { front: null, back: null, certificate: null, signature: null };
       state.files = { front: null, back: null, certificate: null };
@@ -2152,6 +2636,7 @@ async function handleStep(text) {
           : 'Terima kasih. Sila muat naik <strong>salinan IC (depan & belakang)</strong>. Pastikan gambar <strong>jelas dan tidak terpotong</strong>.<div class="warn-box">Petua foto:<br>- Letak IC di permukaan rata yang terang<br>- Elakkan kabur, bayang, atau gambar terpotong<br>- Salinan depan dan belakang diperlukan</div>');
       }
       setUploadLabels(state.en);
+      state.identityEditEnabled = false;
       state.sigDataUrl = null;
       state.uploads = { front: null, back: null, certificate: null, signature: null };
       state.files = { front: null, back: null, certificate: null };
@@ -2442,6 +2927,7 @@ async function submitIC() {
 
   uploadArea.style.display = 'none';
   uploadBtn.disabled = true;
+  updateIdentityEditVisibility();
 
   const front = state.uploads.front?.document || state.uploads.front;
   const back = state.uploads.back?.document || state.uploads.back;
@@ -2519,6 +3005,7 @@ async function submitIC() {
       state.step = 'done';
       setInput(false);
       clearSubmissionContext();
+      updateIdentityEditVisibility();
       return;
     }
 
@@ -2533,9 +3020,11 @@ async function submitIC() {
       );
       await addMsg(renderOcrVerificationBubble({ ...ocrVerification, message: ocrMessage }), 'error');
       state.step = 'ask_ic_copy';
+      state.identityEditEnabled = true;
       uploadArea.style.display = 'flex';
       setInput(false);
       checkAllFilled();
+      updateIdentityEditVisibility();
       return;
     }
 
@@ -2546,9 +3035,11 @@ async function submitIC() {
         errors: { submission: 'The backend did not return a request number.' },
       }, 'Submission request is missing.');
       state.step = 'ask_ic_copy';
+      state.identityEditEnabled = false;
       uploadArea.style.display = 'flex';
       setInput(false);
       checkAllFilled();
+      updateIdentityEditVisibility();
       return;
     }
 
@@ -2633,8 +3124,10 @@ async function submitIC() {
       );
     }
     state.step = 'done';
+    state.identityEditEnabled = false;
     setInput(false);
     clearSubmissionContext();
+    updateIdentityEditVisibility();
   } catch (error) {
     ocrWaitSequence.stop();
     if (displayWaitSequence) {
@@ -2642,9 +3135,11 @@ async function submitIC() {
     }
     await showApiError(error, 'Submission failed.');
     state.step = 'ask_ic_copy';
+    state.identityEditEnabled = false;
     uploadArea.style.display = 'flex';
     setInput(false);
     checkAllFilled();
+    updateIdentityEditVisibility();
   }
 }
 

@@ -105,6 +105,28 @@ final class SessionController extends AbstractController
         return $this->success($result, 'Identity saved.');
     }
 
+    public function identityEdit(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+
+        $result = $this->sessionService->updateIdentityDetails($sessionId, $payload);
+
+        return $this->success([
+            'session' => $result,
+        ], 'Identity details updated.');
+    }
+
+    public function retryEdit(array $request): array
+    {
+        $payload = $this->payload($request);
+        $sessionId = $this->requireString($payload, 'session_id', 'Session ID is required.', 'SESSION_ID_REQUIRED');
+
+        $result = $this->sessionService->updateRetryEditableData($sessionId, $payload);
+
+        return $this->success($result, 'Retry data updated.');
+    }
+
     public function mobile(array $request): array
     {
         $payload = $this->payload($request);
