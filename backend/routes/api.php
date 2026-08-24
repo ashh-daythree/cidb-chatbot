@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Cidb\Backend\Controllers\AssistanceController;
 use Cidb\Backend\Controllers\DocumentController;
 use Cidb\Backend\Controllers\FaqController;
 use Cidb\Backend\Controllers\SessionController;
@@ -160,10 +161,22 @@ return [
         'action' => 'questions',
     ],
     [
+        'method' => 'GET',
+        'path' => '/faq/search',
+        'controller' => FaqController::class,
+        'action' => 'search',
+    ],
+    [
         'method' => 'POST',
         'path' => '/documents/upload',
         'controller' => DocumentController::class,
         'action' => 'upload',
+    ],
+    [
+        'method' => 'POST',
+        'path' => '/assistance/submit',
+        'controller' => AssistanceController::class,
+        'action' => 'submit',
     ],
     [
         'method' => 'POST',

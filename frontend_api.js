@@ -121,6 +121,9 @@ const state = {
   faqSubtopics: [],
   faqSubtopicCode: '',
   faqQuestionOffset: 0,
+  faqEnquiryTitle: '',
+  faqSelectedTopic: null,
+  faqApplicantCategory: '',
   sigDataUrl: null,
   uploads: { front: null, back: null, certificate: null, signature: null },
   files: { front: null, back: null, certificate: null, signature: null },
@@ -1509,6 +1512,17 @@ function buildFaqTopicPayload(text) {
   return match ? { topic_code: match.topic_code, topic: match } : null;
 }
 
+function faqApplicantCategoryOptions() {
+  return state.en ? ['Individual', 'Company'] : ['Individu', 'Syarikat'];
+}
+
+function buildFaqApplicantCategoryPayload(text) {
+  const value = String(text || '').trim().toLowerCase();
+  if (['individual', 'individu'].includes(value)) return { category: 'individual' };
+  if (['company', 'syarikat'].includes(value)) return { category: 'company' };
+  return null;
+}
+
 function faqSubtopicLabel(subtopic) {
   return state.en ? (subtopic.label_en || subtopic.subtopic_code) : (subtopic.label_ms || subtopic.subtopic_code);
 }
@@ -1526,17 +1540,34 @@ function buildFaqSubtopicPayload(text) {
   return match ? { subtopic_code: match.subtopic_code, subtopic: match } : null;
 }
 
+async function searchFaqQuestions(term, offset = 0) {
+  const response = await apiRequest(`/faq/search?q=${encodeURIComponent(term)}&offset=${offset}`, { cache: 'no-store' });
+  return extractData(response);
+}
+
 let faqAnswerIdCounter = 0;
+const faqAnswerQuestionText = {};
 
 function renderFaqQuestionList(questions) {
+  const feedbackPrompt = state.en ? 'Did this resolve your query?' : 'Adakah ini menyelesaikan pertanyaan anda?';
+  const yesLabel = state.en ? 'Yes' : 'Ya';
+  const noLabel = state.en ? 'No' : 'Tidak';
   const itemsHtml = questions.map(question => {
     faqAnswerIdCounter += 1;
     const answerId = `faq-answer-${faqAnswerIdCounter}`;
     const questionText = state.en ? (question.question_en || '') : (question.question_ms || '');
     const answerText = state.en ? (question.answer_en || '') : (question.answer_ms || '');
+    faqAnswerQuestionText[answerId] = questionText;
     return `<div class="faq-item">
       <button type="button" class="faq-question-btn" onclick="toggleFaqAnswer('${answerId}')">${escapeHtml(questionText)}</button>
-      <div class="faq-answer" id="${answerId}">${escapeHtml(answerText)}</div>
+      <div class="faq-answer" id="${answerId}">
+        ${escapeHtml(answerText)}
+        <div class="faq-feedback">
+          <p>${escapeHtml(feedbackPrompt)}</p>
+          <button type="button" class="faq-feedback-btn" onclick="handleFaqFeedback(true, '${answerId}')">${escapeHtml(yesLabel)}</button>
+          <button type="button" class="faq-feedback-btn" onclick="handleFaqFeedback(false, '${answerId}')">${escapeHtml(noLabel)}</button>
+        </div>
+      </div>
     </div>`;
   }).join('');
   return `<div class="faq-list">${itemsHtml}</div>`;
@@ -1546,6 +1577,185 @@ function toggleFaqAnswer(answerId) {
   const el = document.getElementById(answerId);
   if (!el) return;
   el.classList.toggle('open');
+}
+
+function endFaqConversation(message) {
+  setQR([]);
+  addMsg(message, 'bot').then(() => {
+    setInput(false);
+    state.step = 'done';
+  });
+}
+
+async function finishFaqCustomerInfoCollection() {
+  state.step = 'ask_faq_subtopic';
+  await showTyping(400);
+  await addMsg(state.en
+    ? `Here are the subtopics under <strong>${escapeHtml(faqTopicLabel(state.faqSelectedTopic || {}))}</strong>:`
+    : `Berikut ialah subtopik di bawah <strong>${escapeHtml(faqTopicLabel(state.faqSelectedTopic || {}))}</strong>:`);
+  setQR(faqSubtopicOptions());
+  setInput(true);
+}
+
+async function handleFaqFeedback(resolved, answerId) {
+  if (resolved) {
+    const customerName = state.name;
+    const message = state.en
+      ? `Thank you, ${escapeHtml(customerName || '')}, for using CIDB BENA Chat.<br>Your chat session has ended.`
+      : `Terima kasih, ${escapeHtml(customerName || '')}, kerana menggunakan CIDB BENA Chat.<br>Sesi chat anda telah tamat.`;
+    endFaqConversation(message);
+    return;
+  }
+
+  state.faqEnquiryTitle = faqAnswerQuestionText[answerId] || '';
+  await addMsg(renderAssistanceForm());
+}
+
+let assistanceFormIdCounter = 0;
+
+function renderAssistanceForm() {
+  assistanceFormIdCounter += 1;
+  const formId = `assistance-form-${assistanceFormIdCounter}`;
+  const isCompany = state.faqApplicantCategory === 'company';
+  const customerName = state.name;
+  const email = state.email;
+
+  const labels = state.en ? {
+    title: 'Assistance Form',
+    state: 'State',
+    customerName: 'Customer Name',
+    category: 'Applicant Category',
+    phone: 'Phone Number',
+    email: 'Email Address',
+    enquiryTitle: 'Enquiry Title',
+    enquiryDescription: 'Enquiry Description',
+    idNumber: 'MyKad / Passport No.',
+    companyName: 'Company Name',
+    companyRegNo: 'Company Registration No.',
+    attachment: 'Supporting Documents (optional)',
+    submit: 'Submit',
+    individual: 'Individual',
+    company: 'Company',
+  } : {
+    title: 'Borang Bantuan',
+    state: 'Negeri',
+    customerName: 'Nama Pelanggan',
+    category: 'Kategori Pemohon',
+    phone: 'Nombor Telefon',
+    email: 'Alamat E-mel',
+    enquiryTitle: 'Tajuk Pertanyaan',
+    enquiryDescription: 'Keterangan Pertanyaan',
+    idNumber: 'No. MyKad / Pasport',
+    companyName: 'Nama Syarikat',
+    companyRegNo: 'No. Pendaftaran Syarikat',
+    attachment: 'Dokumen Sokongan (pilihan)',
+    submit: 'Hantar',
+    individual: 'Individu',
+    company: 'Syarikat',
+  };
+
+  const companyFieldsHtml = isCompany ? `
+    <label>${escapeHtml(labels.companyName)}
+      <input type="text" id="${formId}-company-name" value="${escapeHtml(state.companyName || '')}" />
+    </label>
+    <label>${escapeHtml(labels.companyRegNo)}
+      <input type="text" id="${formId}-company-reg-no" value="${escapeHtml(state.companyPpkNumber || '')}" />
+    </label>` : '';
+
+  return `<div class="assistance-form" id="${formId}">
+    <h4>${escapeHtml(labels.title)}</h4>
+    <div class="assistance-prefilled">
+      <p><strong>${escapeHtml(labels.state)}:</strong> ${escapeHtml(state.stateName || '')}</p>
+      <p><strong>${escapeHtml(labels.customerName)}:</strong> ${escapeHtml(customerName || '')}</p>
+      <p><strong>${escapeHtml(labels.category)}:</strong> ${escapeHtml(isCompany ? labels.company : labels.individual)}</p>
+      <p><strong>${escapeHtml(labels.phone)}:</strong> ${escapeHtml(state.mobile || '')}</p>
+      <p><strong>${escapeHtml(labels.email)}:</strong> ${escapeHtml(email || '')}</p>
+      <p><strong>${escapeHtml(labels.enquiryTitle)}:</strong> ${escapeHtml(state.faqEnquiryTitle || '')}</p>
+    </div>
+    <label>${escapeHtml(labels.enquiryDescription)}
+      <textarea id="${formId}-description" rows="3"></textarea>
+    </label>
+    <label>${escapeHtml(labels.idNumber)}
+      <input type="text" id="${formId}-id-number" />
+    </label>
+    ${companyFieldsHtml}
+    <label>${escapeHtml(labels.attachment)}
+      <input type="file" id="${formId}-attachment" />
+    </label>
+    <button type="button" class="assistance-submit-btn" onclick="submitAssistanceForm('${formId}')">${escapeHtml(labels.submit)}</button>
+  </div>`;
+}
+
+async function uploadAssistanceAttachment(file) {
+  const form = new FormData();
+  form.append('session_id', state.sessionId);
+  form.append('document_type_code', 'ASSISTANCE_ATTACHMENT');
+  form.append('file_field', 'file');
+  form.append('file', file, file.name || 'attachment.bin');
+  form.append('upload_source', 'user_upload');
+  const response = await apiRequest('/documents/upload', { method: 'POST', body: form });
+  return extractData(response);
+}
+
+async function submitAssistanceForm(formId) {
+  const isCompany = state.faqApplicantCategory === 'company';
+  const descriptionEl = document.getElementById(`${formId}-description`);
+  const idNumberEl = document.getElementById(`${formId}-id-number`);
+  const companyNameEl = document.getElementById(`${formId}-company-name`);
+  const companyRegNoEl = document.getElementById(`${formId}-company-reg-no`);
+  const attachmentEl = document.getElementById(`${formId}-attachment`);
+
+  const description = String(descriptionEl?.value || '').trim();
+  const idNumber = String(idNumberEl?.value || '').trim();
+  const companyName = String(companyNameEl?.value || '').trim();
+  const companyRegNo = String(companyRegNoEl?.value || '').trim();
+
+  if (!description || !idNumber || (isCompany && (!companyName || !companyRegNo))) {
+    await showApiError({ message: state.en ? 'Please complete all required fields.' : 'Sila lengkapkan semua medan yang diperlukan.' });
+    return;
+  }
+
+  const formEl = document.getElementById(formId);
+  const submitBtn = formEl ? formEl.querySelector('.assistance-submit-btn') : null;
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    let attachmentDocumentId = null;
+    const file = attachmentEl && attachmentEl.files ? attachmentEl.files[0] : null;
+    if (file) {
+      const uploaded = await uploadAssistanceAttachment(file);
+      attachmentDocumentId = uploaded?.document?.id || uploaded?.id || null;
+    }
+
+    const customerName = state.name;
+    const email = state.email;
+
+    await apiRequest('/assistance/submit', {
+      method: 'POST',
+      body: {
+        session_id: state.sessionId,
+        state: state.stateName,
+        customer_name: customerName,
+        applicant_category: isCompany ? 'company' : 'individual',
+        phone: state.mobile,
+        email,
+        enquiry_title: state.faqEnquiryTitle,
+        enquiry_description: description,
+        id_number: idNumber,
+        company_name: isCompany ? companyName : null,
+        company_registration_no: isCompany ? companyRegNo : null,
+        attachment_document_id: attachmentDocumentId,
+      },
+    });
+
+    const message = state.en
+      ? 'Thank you. Our team will contact you via email within 2 working days.'
+      : 'Terima kasih. Pasukan kami akan menghubungi anda melalui e-mel dalam tempoh 2 hari bekerja.';
+    endFaqConversation(message);
+  } catch (error) {
+    await showApiError(error, state.en ? 'Unable to submit the assistance request.' : 'Tidak dapat menghantar permintaan bantuan.');
+    if (submitBtn) submitBtn.disabled = false;
+  }
 }
 
 function buildStatePayload(text) {
@@ -2067,7 +2277,7 @@ async function handleStep(text) {
         state.faqTopics = Array.isArray(topicsData.topics) ? topicsData.topics : [];
         state.step = 'ask_faq_topic';
         await showTyping(450);
-        await addMsg(state.en ? 'Please choose an FAQ topic:' : 'Sila pilih topik Soalan Lazim:');
+        await addMsg(state.en ? 'Please choose an FAQ topic, or type a keyword to search directly:' : 'Sila pilih topik Soalan Lazim, atau taip kata kunci untuk mencari terus:');
         setQR(faqTopicOptions());
         setInput(true);
         await refreshSession();
@@ -2120,7 +2330,29 @@ async function handleStep(text) {
 
     const payload = buildFaqTopicPayload(text);
     if (!payload) {
-      await showApiError({ message: 'Invalid FAQ topic selected.', errors: { topic: 'Please choose a listed FAQ topic.' } }, 'Invalid FAQ topic selected.');
+      try {
+        const searchData = await searchFaqQuestions(text);
+        const questions = Array.isArray(searchData.questions) ? searchData.questions : [];
+        const suggestions = Array.isArray(searchData.suggestions) ? searchData.suggestions : [];
+        if (questions.length > 0) {
+          await showTyping(300);
+          await addMsg(renderFaqQuestionList(questions));
+          setQR([state.en ? 'Back to menu' : 'Kembali ke menu']);
+          setInput(true);
+          return;
+        }
+        if (suggestions.length > 0) {
+          await showTyping(300);
+          await addMsg(state.en ? 'No exact match found. Did you mean one of these?' : 'Tiada padanan tepat dijumpai. Adakah anda maksudkan salah satu daripada ini?');
+          await addMsg(renderFaqQuestionList(suggestions));
+          setQR([state.en ? 'Back to menu' : 'Kembali ke menu']);
+          setInput(true);
+          return;
+        }
+      } catch (error) {
+        // fall through to the "no match" prompt below
+      }
+      await showApiError({ message: state.en ? 'No matching FAQ found. Try a different keyword or choose a topic below.' : 'Tiada Soalan Lazim sepadan dijumpai. Cuba kata kunci lain atau pilih topik di bawah.' }, 'Invalid FAQ topic selected.');
       await addMsg(state.en ? 'Please choose an FAQ topic:' : 'Sila pilih topik Soalan Lazim:');
       setQR(faqTopicOptions());
       setInput(true);
@@ -2132,12 +2364,14 @@ async function handleStep(text) {
       updateSessionStateFromSession(isPlainObject(data.session) ? data.session : data);
       state.faqTopicCode = payload.topic_code;
       state.faqSubtopics = Array.isArray(data.subtopics) ? data.subtopics : [];
-      state.step = 'ask_faq_subtopic';
+      state.faqSelectedTopic = payload.topic;
+      state.step = 'ask_faq_customer_name';
       await showTyping(400);
       await addMsg(state.en
-        ? `Here are the subtopics under <strong>${escapeHtml(faqTopicLabel(payload.topic))}</strong>:`
-        : `Berikut ialah subtopik di bawah <strong>${escapeHtml(faqTopicLabel(payload.topic))}</strong>:`);
-      setQR(faqSubtopicOptions());
+        ? 'To continue with your selected enquiry and help us assist you more accurately, please provide the following information:<div class="info-box">1. Full Name<br>2. Phone Number<br>3. State<br>4. Applicant Category (Individual / Company)<br>5. Personal Email<br>6. Company Email (required if Applicant Category = Company)</div>'
+        : 'Untuk meneruskan pertanyaan yang anda pilih dan membantu kami membantu anda dengan lebih tepat, sila berikan maklumat berikut:<div class="info-box">1. Nama Penuh<br>2. Nombor Telefon<br>3. Negeri<br>4. Kategori Pemohon (Individu / Syarikat)<br>5. Emel Peribadi<br>6. Emel Syarikat (diperlukan jika Kategori Pemohon = Syarikat)</div>');
+      await showTyping(450);
+      await addMsg(state.en ? 'May I have your <strong>full name</strong> please?' : 'Boleh saya dapatkan <strong>nama penuh</strong> anda?');
       setInput(true);
       await refreshSession();
       return;
@@ -2148,6 +2382,107 @@ async function handleStep(text) {
       setInput(true);
       return;
     }
+  }
+
+  if (state.step === 'ask_faq_customer_name') {
+    const trimmedName = String(text || '').trim();
+    if (!trimmedName) {
+      await showApiError({ message: 'Full name is required.', errors: { full_name: 'Please enter your full name.' } }, 'Full name is required.');
+      await addMsg(state.en ? 'May I have your <strong>full name</strong> please?' : 'Boleh saya dapatkan <strong>nama penuh</strong> anda?');
+      setInput(true);
+      return;
+    }
+    state.name = trimmedName;
+    state.step = 'ask_faq_customer_phone';
+    await showTyping(400);
+    await addMsg(state.en ? `Thank you, <strong>${escapeHtml(trimmedName)}</strong>! May I have your <strong>phone number</strong>?` : `Terima kasih, <strong>${escapeHtml(trimmedName)}</strong>! Boleh saya dapatkan <strong>nombor telefon</strong> anda?`);
+    setInput(true);
+    return;
+  }
+
+  if (state.step === 'ask_faq_customer_phone') {
+    const payload = buildMobilePayload(text);
+    if (!payload) {
+      await showApiError({ message: 'Invalid phone number.', errors: { phone: 'Enter a valid phone number.' } }, 'Invalid phone number.');
+      await addMsg(state.en ? 'Please enter a valid <strong>phone number</strong>.' : 'Sila masukkan <strong>nombor telefon</strong> yang sah.');
+      setInput(true);
+      return;
+    }
+    state.mobile = payload.mobile;
+    state.step = 'ask_faq_customer_state';
+    await showTyping(400);
+    await addMsg(state.en ? 'Which <strong>state</strong> are you contacting us from?' : 'Dari <strong>negeri</strong> manakah anda menghubungi kami?');
+    setQR(MY_STATES);
+    setInput(true);
+    return;
+  }
+
+  if (state.step === 'ask_faq_customer_state') {
+    const payload = buildStatePayload(text);
+    if (!payload) {
+      await showApiError({ message: 'Invalid Malaysian state selected.', errors: { state: 'Please choose a valid Malaysian state.' } }, 'Invalid Malaysian state selected.');
+      await addMsg(state.en ? 'Which <strong>state</strong> are you contacting us from?' : 'Dari <strong>negeri</strong> manakah anda menghubungi kami?');
+      setQR(MY_STATES);
+      setInput(true);
+      return;
+    }
+    state.stateName = payload.state;
+    state.step = 'ask_faq_customer_category';
+    await showTyping(400);
+    await addMsg(state.en ? 'Are you enquiring as an <strong>Individual</strong> or a <strong>Company</strong>?' : 'Adakah anda membuat pertanyaan sebagai <strong>Individu</strong> atau <strong>Syarikat</strong>?');
+    setQR(faqApplicantCategoryOptions());
+    setInput(true);
+    return;
+  }
+
+  if (state.step === 'ask_faq_customer_category') {
+    const payload = buildFaqApplicantCategoryPayload(text);
+    if (!payload) {
+      await showApiError({ message: 'Invalid applicant category.', errors: { applicant_category: 'Please choose Individual or Company.' } }, 'Invalid applicant category.');
+      await addMsg(state.en ? 'Are you enquiring as an <strong>Individual</strong> or a <strong>Company</strong>?' : 'Adakah anda membuat pertanyaan sebagai <strong>Individu</strong> atau <strong>Syarikat</strong>?');
+      setQR(faqApplicantCategoryOptions());
+      setInput(true);
+      return;
+    }
+    state.faqApplicantCategory = payload.category;
+    state.step = 'ask_faq_customer_email';
+    await showTyping(400);
+    await addMsg(state.en ? 'Please provide your <strong>personal email address</strong>.' : 'Sila berikan <strong>alamat emel peribadi</strong> anda.');
+    setInput(true);
+    return;
+  }
+
+  if (state.step === 'ask_faq_customer_email') {
+    const payload = buildEmailPayload(text);
+    if (!payload) {
+      await showApiError({ message: 'Invalid email address.', errors: { email: 'Enter a valid email address.' } }, 'Invalid email address.');
+      await addMsg(state.en ? 'Please provide a valid <strong>personal email address</strong>.' : 'Sila berikan <strong>alamat emel peribadi</strong> yang sah.');
+      setInput(true);
+      return;
+    }
+    state.email = payload.email;
+    if (state.faqApplicantCategory === 'company') {
+      state.step = 'ask_faq_customer_company_email';
+      await showTyping(400);
+      await addMsg(state.en ? 'Please provide the <strong>company email address</strong>.' : 'Sila berikan <strong>alamat emel syarikat</strong>.');
+      setInput(true);
+      return;
+    }
+    await finishFaqCustomerInfoCollection();
+    return;
+  }
+
+  if (state.step === 'ask_faq_customer_company_email') {
+    const payload = buildEmailPayload(text);
+    if (!payload) {
+      await showApiError({ message: 'Invalid company email address.', errors: { company_email: 'Enter a valid email address.' } }, 'Invalid company email address.');
+      await addMsg(state.en ? 'Please provide a valid <strong>company email address</strong>.' : 'Sila berikan <strong>alamat emel syarikat</strong> yang sah.');
+      setInput(true);
+      return;
+    }
+    state.companyEmail = payload.email;
+    await finishFaqCustomerInfoCollection();
+    return;
   }
 
   if (state.step === 'ask_faq_subtopic') {
@@ -2200,7 +2535,29 @@ async function handleStep(text) {
 
     const payload = buildFaqSubtopicPayload(text);
     if (!payload) {
-      await showApiError({ message: 'Invalid FAQ subtopic selected.', errors: { subtopic: 'Please choose a listed FAQ subtopic.' } }, 'Invalid FAQ subtopic selected.');
+      try {
+        const searchData = await searchFaqQuestions(text);
+        const questions = Array.isArray(searchData.questions) ? searchData.questions : [];
+        const suggestions = Array.isArray(searchData.suggestions) ? searchData.suggestions : [];
+        if (questions.length > 0) {
+          await showTyping(300);
+          await addMsg(renderFaqQuestionList(questions));
+          setQR([backTopicsLabel, backMenuLabel]);
+          setInput(true);
+          return;
+        }
+        if (suggestions.length > 0) {
+          await showTyping(300);
+          await addMsg(state.en ? 'No exact match found. Did you mean one of these?' : 'Tiada padanan tepat dijumpai. Adakah anda maksudkan salah satu daripada ini?');
+          await addMsg(renderFaqQuestionList(suggestions));
+          setQR([backTopicsLabel, backMenuLabel]);
+          setInput(true);
+          return;
+        }
+      } catch (error) {
+        // fall through to the "no match" prompt below
+      }
+      await showApiError({ message: state.en ? 'No matching FAQ found. Try a different keyword or choose a subtopic below.' : 'Tiada Soalan Lazim sepadan dijumpai. Cuba kata kunci lain atau pilih subtopik di bawah.' }, 'Invalid FAQ subtopic selected.');
       await addMsg(state.en ? 'Please choose a subtopic:' : 'Sila pilih subtopik:');
       setQR(faqSubtopicOptions());
       setInput(true);
