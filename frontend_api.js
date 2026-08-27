@@ -87,12 +87,12 @@ const SERVICE_OPTIONS = {
   en: [
     { value: 'individual', label: '1. Individual Email ID Cancellation' },
     { value: 'company', label: '2. Company Email ID Cancellation' },
-    { value: 'faq', label: '3. FAQ' },
+    { value: 'faq', label: '3. PPK/SPKK/STB Renewal Process' },
   ],
   ms: [
     { value: 'individual', label: '1. Pembatalan Email ID Individu' },
     { value: 'company', label: '2. Pembatalan Email ID Syarikat' },
-    { value: 'faq', label: '3. Soalan Lazim' },
+    { value: 'faq', label: '3. Proses Pembaharuan PPK/SPKK/STB' },
   ],
 };
 
@@ -926,22 +926,85 @@ function setInput(on) {
   sendBtn.disabled = !on;
 }
 
+function isServiceOptionSet(opts) {
+  return Array.isArray(opts)
+    && opts.length === 3
+    && opts.every(option =>
+      isPlainObject(option)
+      && ['individual', 'company', 'faq'].includes(String(option.value || ''))
+      && typeof option.label === 'string');
+}
+
+function splitQuickReplyLabel(label) {
+  const match = String(label || '').match(/^(\d+)\.\s*(.+)$/);
+  if (match) {
+    return { title: match[2] };
+  }
+  return { title: String(label || '') };
+}
+
+function getServiceOptionIcon(value) {
+  const icons = {
+    individual: `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="8" r="3.2"></circle>
+        <path d="M5.5 19c.7-3.1 3.1-4.8 6.5-4.8s5.8 1.7 6.5 4.8"></path>
+      </svg>
+    `,
+    company: `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4.5 19.5h15"></path>
+        <path d="M6.5 19.5V6.8h5.2v12.7"></path>
+        <path d="M11.7 19.5V4.5h5.8v15"></path>
+        <path d="M8.1 9.2h1.2M8.1 12h1.2M8.1 14.8h1.2M13.2 7.4h1.2M13.2 10.2h1.2M13.2 13h1.2M13.2 15.8h1.2"></path>
+      </svg>
+    `,
+    faq: `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M6.5 4.8h8.9L18.5 8v11.2H6.5z"></path>
+        <path d="M15.4 4.8V8h3.1"></path>
+        <path d="M9.4 12.1c.2-1.5 1.4-2.5 2.8-2.5 1.3 0 2.3.8 2.3 2 0 1.1-.8 1.6-1.7 2-.8.3-1.2.8-1.2 1.6"></path>
+        <circle cx="12.6" cy="17.5" r="0.9"></circle>
+      </svg>
+    `,
+  };
+  return icons[value] || icons.faq;
+}
+
 function setQR(opts) {
   quickRepliesEl.innerHTML = '';
+  quickRepliesEl.classList.toggle('service-options', isServiceOptionSet(opts));
   opts.forEach(option => {
     const button = document.createElement('button');
     button.className = 'qr-btn';
     if (isPlainObject(option)) {
-      button.textContent = option.label ?? option.text ?? option.value ?? '';
-      button.dataset.value = String(option.value ?? option.label ?? '');
+      const label = String(option.label ?? option.text ?? option.value ?? '');
+      const display = String(option.display ?? label);
+      const value = String(option.value ?? option.label ?? '');
+      button.dataset.value = value;
+      button.dataset.display = display;
+      if (quickRepliesEl.classList.contains('service-options')) {
+        const parts = splitQuickReplyLabel(label);
+        button.classList.add('qr-option');
+        button.innerHTML = `
+          <span class="qr-option-icon" aria-hidden="true">${getServiceOptionIcon(value)}</span>
+          <span class="qr-option-copy">
+            <span class="qr-option-title">${escapeHtml(parts.title || display)}</span>
+          </span>
+        `;
+      } else {
+        button.textContent = display;
+      }
     } else {
-      button.textContent = option;
-      button.dataset.value = String(option);
+      const display = String(option);
+      button.textContent = display;
+      button.dataset.value = display;
+      button.dataset.display = display;
     }
     button.onclick = () => {
       quickRepliesEl.innerHTML = '';
       pendingQuickReplyValue = button.dataset.value || null;
-      pendingQuickReplyDisplay = button.textContent || '';
+      pendingQuickReplyDisplay = button.dataset.display || button.textContent || '';
       inputEl.value = pendingQuickReplyDisplay;
       sendMessage();
     };
@@ -1491,6 +1554,25 @@ function buildServicePayload(text) {
   return null;
 }
 
+function isRenewalFaqQuery(text) {
+  const value = String(text || '').trim().toLowerCase();
+  if (!value) {
+    return false;
+  }
+
+  return [
+    'ppk',
+    'spkk',
+    'stb',
+    'renewal',
+    'renew',
+    'pembaharuan',
+    'perbaharui',
+    'mcore',
+    'score',
+  ].some(keyword => value.includes(keyword));
+}
+
 function getServiceQuickReplies() {
   return state.en ? SERVICE_OPTIONS.en : SERVICE_OPTIONS.ms;
 }
@@ -1543,6 +1625,58 @@ function buildFaqSubtopicPayload(text) {
 async function searchFaqQuestions(term, offset = 0) {
   const response = await apiRequest(`/faq/search?q=${encodeURIComponent(term)}&offset=${offset}`, { cache: 'no-store' });
   return extractData(response);
+}
+
+async function routeRenewalQueryToFaq(text) {
+  const response = await apiRequest('/session/service', {
+    method: 'POST',
+    body: { session_id: state.sessionId, service_type: 'faq' },
+  });
+  const data = extractData(response);
+  updateSessionStateFromSession(isPlainObject(data.session) ? data.session : data);
+  state.serviceType = 'faq';
+  state.step = 'ask_faq_topic';
+  state.faqTopicCode = '';
+  state.faqSubtopics = [];
+  state.faqSubtopicCode = '';
+  state.faqQuestionOffset = 0;
+  state.faqEnquiryTitle = '';
+  state.faqSelectedTopic = null;
+  state.faqApplicantCategory = '';
+
+  const topicsResponse = await apiRequest('/faq/topics', { method: 'GET' });
+  const topicsData = extractData(topicsResponse);
+  state.faqTopics = Array.isArray(topicsData.topics) ? topicsData.topics : [];
+
+  const searchData = await searchFaqQuestions(text);
+  const questions = Array.isArray(searchData.questions) ? searchData.questions : [];
+  const suggestions = Array.isArray(searchData.suggestions) ? searchData.suggestions : [];
+
+  if (questions.length > 0) {
+    await showTyping(300);
+    await addMsg(renderFaqQuestionList(questions));
+    setQR([state.en ? 'Back to menu' : 'Kembali ke menu']);
+    setInput(true);
+    await refreshSession();
+    return true;
+  }
+
+  if (suggestions.length > 0) {
+    await showTyping(300);
+    await addMsg(state.en ? 'No exact match found. Did you mean one of these?' : 'Tiada padanan tepat dijumpai. Adakah anda maksudkan salah satu daripada ini?');
+    await addMsg(renderFaqQuestionList(suggestions));
+    setQR([state.en ? 'Back to menu' : 'Kembali ke menu']);
+    setInput(true);
+    await refreshSession();
+    return true;
+  }
+
+  await showTyping(300);
+  await addMsg(state.en ? 'Please choose an FAQ topic, or type a keyword to search directly:' : 'Sila pilih topik Soalan Lazim, atau taip kata kunci untuk mencari terus:');
+  setQR(faqTopicOptions());
+  setInput(true);
+  await refreshSession();
+  return true;
 }
 
 let faqAnswerIdCounter = 0;
@@ -2241,9 +2375,7 @@ async function handleStep(text) {
       state.languageCode = payload.language;
       state.step = 'ask_service';
       await showTyping(450);
-      await addMsg(state.en ? 'Thank you! My name is <strong>Bena</strong> and I am here to help you today.' : 'Terima kasih! Nama saya <strong>Bena</strong> dan saya di sini untuk membantu anda hari ini.');
-      await showTyping(450);
-      await addMsg(state.en ? 'What do you need help with today?' : 'Apakah bantuan yang anda perlukan hari ini?');
+      await addMsg(state.en ? 'Hi, I\'m <strong>Bena</strong>. How can I assist you today?' : 'Hai, saya <strong>Bena</strong>. Bagaimana saya boleh membantu anda hari ini?');
       setQR(getServiceQuickReplies());
       setInput(true);
       await refreshSession();
@@ -2260,8 +2392,20 @@ async function handleStep(text) {
   if (state.step === 'ask_service') {
     const payload = buildServicePayload(text);
     if (!payload) {
+      if (isRenewalFaqQuery(text)) {
+        try {
+          await routeRenewalQueryToFaq(text);
+          return;
+        } catch (error) {
+          await showApiError(error, 'Unable to open FAQ search.');
+          await addMsg(state.en ? 'Please choose a service above or try a different keyword.' : 'Sila pilih perkhidmatan di atas atau cuba kata kunci lain.');
+          setQR(getServiceQuickReplies());
+          setInput(true);
+          return;
+        }
+      }
       await showApiError({ message: 'Invalid service selected.', errors: { service: 'Please choose a supported service.' } }, 'Invalid service selected.');
-      await addMsg(state.en ? 'What do you need help with today?' : 'Apakah bantuan yang anda perlukan hari ini?');
+      await addMsg(state.en ? 'Hi, I\'m <strong>Bena</strong>. How can I assist you today?' : 'Hai, saya <strong>Bena</strong>. Bagaimana saya boleh membantu anda hari ini?');
       setQR(getServiceQuickReplies());
       setInput(true);
       return;
@@ -2288,6 +2432,10 @@ async function handleStep(text) {
         state.step = 'ask_company_ppk';
         await showTyping(450);
         await addMsg(state.en
+          ? 'To proceed with your <strong>Company Email ID Cancellation</strong> request, please provide the following:<div class="info-box">1. PPK / SSM number<br>2. Company name<br>3. Company email address<br>4. Company contact number<br>5. Company state<br>6. Director full name<br>7. Director IC number<br>8. Reason for cancellation<br>9. Director IC front and back<br>10. SSM / PPK certificate</div>'
+          : 'Untuk meneruskan permohonan <strong>Pembatalan Email ID Syarikat</strong> anda, sila sediakan maklumat berikut:<div class="info-box">1. Nombor PPK / SSM<br>2. Nama syarikat<br>3. Alamat emel syarikat<br>4. Nombor telefon syarikat<br>5. Negeri syarikat<br>6. Nama penuh pengarah<br>7. Nombor IC pengarah<br>8. Sebab pembatalan<br>9. IC pengarah bahagian depan dan belakang<br>10. Sijil SSM / PPK</div>');
+        await showTyping(350);
+        await addMsg(state.en
           ? 'Please provide your <strong>PPK / SSM number</strong> to begin the company cancellation request.'
           : 'Sila berikan <strong>nombor PPK / SSM</strong> anda untuk memulakan permohonan pembatalan syarikat.');
         setInput(true);
@@ -2306,7 +2454,7 @@ async function handleStep(text) {
       return;
     } catch (error) {
       await showApiError(error, 'Unable to save service selection.');
-      await addMsg(state.en ? 'What do you need help with today?' : 'Apakah bantuan yang anda perlukan hari ini?');
+      await addMsg(state.en ? 'Hi, I\'m <strong>Bena</strong>. How can I assist you today?' : 'Hai, saya <strong>Bena</strong>. Bagaimana saya boleh membantu anda hari ini?');
       setQR(getServiceQuickReplies());
       setInput(true);
       return;
@@ -2318,12 +2466,8 @@ async function handleStep(text) {
     if (text.trim() === backMenuLabel) {
       state.step = 'ask_service';
       await showTyping(350);
-      await addMsg(state.en ? 'What do you need help with today?' : 'Apakah bantuan yang anda perlukan hari ini?');
-      setQR([
-        state.en ? '1. Individual Email ID Cancellation' : '1. Pembatalan Email ID Individu',
-        state.en ? '2. Company Email ID Cancellation' : '2. Pembatalan Email ID Syarikat',
-        state.en ? '3. FAQ' : '3. Soalan Lazim',
-      ]);
+      await addMsg(state.en ? 'Hi, I\'m <strong>Bena</strong>. How can I assist you today?' : 'Hai, saya <strong>Bena</strong>. Bagaimana saya boleh membantu anda hari ini?');
+      setQR(getServiceQuickReplies());
       setInput(true);
       return;
     }
@@ -2494,12 +2638,8 @@ async function handleStep(text) {
     if (trimmed === backMenuLabel) {
       state.step = 'ask_service';
       await showTyping(350);
-      await addMsg(state.en ? 'What do you need help with today?' : 'Apakah bantuan yang anda perlukan hari ini?');
-      setQR([
-        state.en ? '1. Individual Email ID Cancellation' : '1. Pembatalan Email ID Individu',
-        state.en ? '2. Company Email ID Cancellation' : '2. Pembatalan Email ID Syarikat',
-        state.en ? '3. FAQ' : '3. Soalan Lazim',
-      ]);
+      await addMsg(state.en ? 'Hi, I\'m <strong>Bena</strong>. How can I assist you today?' : 'Hai, saya <strong>Bena</strong>. Bagaimana saya boleh membantu anda hari ini?');
+      setQR(getServiceQuickReplies());
       setInput(true);
       return;
     }
@@ -2844,8 +2984,8 @@ async function handleStep(text) {
       state.step = 'ask_ic_copy';
       await showTyping(450);
       await addMsg(state.en
-        ? 'Thank you. Please upload the director <strong>IC front</strong>, <strong>IC back</strong>, and the <strong>SSM / PPK certificate</strong>.'
-        : 'Terima kasih. Sila muat naik <strong>IC depan</strong>, <strong>IC belakang</strong>, dan <strong>sijil SSM / PPK</strong> pengarah.');
+        ? 'Thank you. Please upload your <strong>directors</strong>\' <strong>IC front</strong>, <strong>IC back</strong>, and the <strong>SSM / PPK certificate</strong>. Make sure the images are <strong>clear and fully visible</strong>.<div class="warn-box">Photo tips:<br>- Place the documents on a flat, well-lit surface<br>- Avoid blur, shadows, or cropping<br>- Both front and back copies are required<br>- Please upload your NRIC with the \'Kegunaan CIDB Only\'</div>'
+        : 'Terima kasih. Sila muat naik <strong>IC pengarah</strong> bahagian depan, <strong>IC belakang</strong>, dan <strong>sijil SSM / PPK</strong>. Pastikan imej <strong>jelas dan kelihatan sepenuhnya</strong>.<div class="warn-box">Petua foto:<br>- Letakkan dokumen di permukaan rata yang terang<br>- Elakkan kabur, bayang, atau pemotongan gambar<br>- Salinan depan dan belakang diperlukan<br>- Sila muat naik NRIC anda dengan \'Kegunaan CIDB Only\'</div>');
       setUploadLabels(state.en);
       state.identityEditEnabled = false;
       state.sigDataUrl = null;
@@ -2989,8 +3129,8 @@ async function handleStep(text) {
           : 'Terima kasih. Sila muat naik salinan <strong>Muka Surat Maklumat Pasport</strong> yang jelas.<div class="warn-box">Petua foto:<br>- Pastikan keseluruhan muka surat kelihatan<br>- Elakkan kabur, bayang, atau gambar terpotong<br>- Pastikan semua butiran boleh dibaca</div>');
       } else {
         await addMsg(state.en
-          ? 'Thank you. Please upload your <strong>IC copy (front & back)</strong>. Make sure the image is <strong>clear and fully visible</strong>.<div class="warn-box">Photo tips:<br>- Place IC on a flat, well-lit surface<br>- Avoid blur, shadows, or cropping<br>- Both front and back copies are required</div>'
-          : 'Terima kasih. Sila muat naik <strong>salinan IC (depan & belakang)</strong>. Pastikan gambar <strong>jelas dan tidak terpotong</strong>.<div class="warn-box">Petua foto:<br>- Letak IC di permukaan rata yang terang<br>- Elakkan kabur, bayang, atau gambar terpotong<br>- Salinan depan dan belakang diperlukan</div>');
+          ? 'Thank you. Please upload your <strong>IC copy (front & back)</strong>. Make sure the image is <strong>clear and fully visible</strong>.<div class="warn-box">Photo tips:<br>- Place IC on a flat, well-lit surface<br>- Avoid blur, shadows, or cropping<br>- Both front and back copies are required<br>- Please upload your NRIC with the \'Kegunaan CIDB Only\'</div>'
+          : 'Terima kasih. Sila muat naik <strong>salinan IC (depan & belakang)</strong>. Pastikan gambar <strong>jelas dan tidak terpotong</strong>.<div class="warn-box">Petua foto:<br>- Letak IC di permukaan rata yang terang<br>- Elakkan kabur, bayang, atau gambar terpotong<br>- Salinan depan dan belakang diperlukan<br>- Sila muat naik NRIC anda dengan \'Kegunaan CIDB Only\'</div>');
       }
       setUploadLabels(state.en);
       state.identityEditEnabled = false;
