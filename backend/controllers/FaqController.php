@@ -12,6 +12,14 @@ final class FaqController extends AbstractController
 {
     private const QUESTIONS_PER_PAGE = 10;
 
+    /**
+     * Free-text search returns only the few most relevant questions rather than
+     * a full page. A short list keeps the chat readable and pushes users toward
+     * the "No" feedback path (assistance form) when none of the top hits fit,
+     * instead of scrolling a long list of loosely-related answers.
+     */
+    private const SEARCH_RESULT_LIMIT = 3;
+
     public function __construct(
         private readonly ReferenceFaqTopicRepository $topicRepository,
         private readonly ReferenceFaqSubtopicRepository $subtopicRepository,
@@ -74,10 +82,10 @@ final class FaqController extends AbstractController
             return $this->success(['questions' => [], 'total' => 0, 'has_more' => false, 'suggestions' => []], 'FAQ search results retrieved.');
         }
 
-        $keywords = $this->extractSearchKeywords($rawTerm);
         $topicCodes = $this->extractSearchTopicCodes($rawTerm);
+        $keywords = $this->extractSearchKeywords($rawTerm, $topicCodes);
 
-        $questions = $this->questionRepository->searchQuestionsByKeywords($keywords, self::QUESTIONS_PER_PAGE, $offset, $topicCodes);
+        $questions = $this->questionRepository->searchQuestionsByKeywords($keywords, self::SEARCH_RESULT_LIMIT, $offset, $topicCodes);
         $total = $this->questionRepository->countSearchQuestionsByKeywords($keywords, $topicCodes);
 
         $suggestions = [];
@@ -94,9 +102,10 @@ final class FaqController extends AbstractController
     }
 
     /**
+     * @param string[] $topicCodes topic codes already recognised in the term
      * @return string[]
      */
-    private function extractSearchKeywords(string $term): array
+    private function extractSearchKeywords(string $term, array $topicCodes = []): array
     {
         $normalized = strtolower((string) preg_replace('/[^a-z0-9\s]/i', ' ', $term));
         $tokens = array_values(array_filter(
@@ -104,6 +113,22 @@ final class FaqController extends AbstractController
             static fn (string $token): bool => $token !== '' && strlen($token) >= 2 && !in_array($token, self::SEARCH_STOPWORDS, true)
         ));
         $tokens = array_slice(array_values(array_unique($tokens)), 0, self::MAX_SEARCH_KEYWORDS);
+
+        // When the term names a topic (PPK/SPKK/STB) *and* carries other
+        // keywords, drop the bare topic token: the topic filter already scopes
+        // results to that document, so keeping "spkk" as a keyword would only
+        // score every other document that name-drops SPKK in its answer text
+        // (e.g. the STB "difference between PPK, SPKK and STB" entry).
+        if ($topicCodes !== []) {
+            $loweredCodes = array_map('strtolower', $topicCodes);
+            $distinguishing = array_values(array_filter(
+                $tokens,
+                static fn (string $token): bool => !in_array($token, $loweredCodes, true)
+            ));
+            if ($distinguishing !== []) {
+                $tokens = $distinguishing;
+            }
+        }
 
         if ($tokens === []) {
             $fallback = trim($normalized);

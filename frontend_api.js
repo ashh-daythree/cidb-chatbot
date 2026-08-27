@@ -1654,6 +1654,7 @@ async function routeRenewalQueryToFaq(text) {
 
   if (questions.length > 0) {
     await showTyping(300);
+    await addMsg(faqSearchIntroMessage());
     await addMsg(renderFaqQuestionList(questions));
     setQR([state.en ? 'Back to menu' : 'Kembali ke menu']);
     setInput(true);
@@ -1681,6 +1682,15 @@ async function routeRenewalQueryToFaq(text) {
 
 let faqAnswerIdCounter = 0;
 const faqAnswerQuestionText = {};
+
+// Free-text search now returns only the top 3 most relevant questions. This
+// line sets that expectation and points users who don't see their answer at the
+// "No" feedback button, which opens the assistance form.
+function faqSearchIntroMessage() {
+  return state.en
+    ? 'Here are the closest matches to your question. If none of them help, tap <strong>No</strong> under an answer to send us an enquiry.'
+    : 'Berikut ialah padanan paling hampir dengan soalan anda. Jika tiada yang membantu, ketik <strong>Tidak</strong> di bawah sesuatu jawapan untuk menghantar pertanyaan kepada kami.';
+}
 
 function renderFaqQuestionList(questions) {
   const feedbackPrompt = state.en ? 'Did this resolve your query?' : 'Adakah ini menyelesaikan pertanyaan anda?';
@@ -2480,6 +2490,7 @@ async function handleStep(text) {
         const suggestions = Array.isArray(searchData.suggestions) ? searchData.suggestions : [];
         if (questions.length > 0) {
           await showTyping(300);
+          await addMsg(faqSearchIntroMessage());
           await addMsg(renderFaqQuestionList(questions));
           setQR([state.en ? 'Back to menu' : 'Kembali ke menu']);
           setInput(true);
@@ -2681,6 +2692,7 @@ async function handleStep(text) {
         const suggestions = Array.isArray(searchData.suggestions) ? searchData.suggestions : [];
         if (questions.length > 0) {
           await showTyping(300);
+          await addMsg(faqSearchIntroMessage());
           await addMsg(renderFaqQuestionList(questions));
           setQR([backTopicsLabel, backMenuLabel]);
           setInput(true);

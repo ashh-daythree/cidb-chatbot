@@ -35,11 +35,16 @@ final class ChatbotFaqQuestionRepository extends BaseRepository
     }
 
     /**
-     * Ranked keyword search: a row scores one point per keyword that appears in
-     * any of the bilingual question/answer columns, ordered by score descending.
-     * This lets a full question like "what is PPK renewal" (tokenized to
-     * ["ppk", "renewal"] by the caller) match rows containing either or both
-     * keywords, ranking rows that hit more keywords higher.
+     * Ranked keyword search: a row scores 3 points per keyword found in the
+     * bilingual question columns and 1 point per keyword found only in the
+     * answer columns, ordered by score descending. Weighting question hits
+     * above answer hits keeps a row whose *question* is about the topic ahead
+     * of one that merely name-drops a keyword deep in its answer body.
+     *
+     * When $topicCodes is non-empty the result set is additionally narrowed
+     * (AND, not OR) to questions whose subtopic belongs to one of those topics,
+     * so "SPKK renewal" returns SPKK renewal questions — not every SPKK
+     * question, and not PPK/STB questions that mention SPKK.
      *
      * @param string[] $keywords
      * @param string[] $topicCodes
@@ -53,7 +58,7 @@ final class ChatbotFaqQuestionRepository extends BaseRepository
         [$fromClause, $scoreExpression, $whereExpression, $params] = $this->buildKeywordMatchSql($keywords, $topicCodes);
 
         $sql = sprintf(
-            'SELECT q.*, (%s) AS match_score FROM %s WHERE q.is_active = true AND (%s) ORDER BY match_score DESC, q.sort_order ASC LIMIT :limit OFFSET :offset',
+            'SELECT q.*, (%s) AS match_score FROM %s WHERE q.is_active = true AND (%s) ORDER BY match_score DESC, char_length(q.question_en) ASC, q.sort_order ASC LIMIT :limit OFFSET :offset',
             $scoreExpression,
             $fromClause,
             $whereExpression
@@ -155,20 +160,32 @@ final class ChatbotFaqQuestionRepository extends BaseRepository
     private function buildKeywordMatchSql(array $keywords, array $topicCodes = []): array
     {
         $scoreParts = [];
-        $whereParts = [];
+        $keywordWhereParts = [];
         $params = [];
         $fromClause = 'chatbot_faq_questions q';
 
         foreach (array_values($keywords) as $index => $keyword) {
             $placeholder = 'kw' . $index;
             $params[$placeholder] = '%' . $keyword . '%';
-            $matchExpr = sprintf(
-                '(q.question_en ILIKE :%1$s OR q.question_ms ILIKE :%1$s OR q.answer_en ILIKE :%1$s OR q.answer_ms ILIKE :%1$s)',
+            $questionMatch = sprintf(
+                '(q.question_en ILIKE :%1$s OR q.question_ms ILIKE :%1$s)',
                 $placeholder
             );
-            $scoreParts[] = sprintf('(%s)::int', $matchExpr);
-            $whereParts[] = $matchExpr;
+            $answerMatch = sprintf(
+                '(q.answer_en ILIKE :%1$s OR q.answer_ms ILIKE :%1$s)',
+                $placeholder
+            );
+            $scoreParts[] = sprintf(
+                '(CASE WHEN %s THEN 3 WHEN %s THEN 1 ELSE 0 END)',
+                $questionMatch,
+                $answerMatch
+            );
+            $keywordWhereParts[] = sprintf('(%s OR %s)', $questionMatch, $answerMatch);
         }
+
+        $whereExpression = $keywordWhereParts === []
+            ? 'false'
+            : '(' . implode(' OR ', $keywordWhereParts) . ')';
 
         $topicCodes = array_values(array_unique(array_filter(array_map(static fn (string $code): string => strtoupper(trim($code)), $topicCodes))));
         if ($topicCodes !== []) {
@@ -179,10 +196,14 @@ final class ChatbotFaqQuestionRepository extends BaseRepository
                 $topicPlaceholders[] = ':' . $placeholder;
                 $params[$placeholder] = $topicCode;
             }
-            $whereParts[] = 's.topic_code IN (' . implode(', ', $topicPlaceholders) . ')';
+            // AND, not OR: the topic code narrows the result set to that
+            // document. OR-ing it (the previous behaviour) meant any query
+            // naming a topic returned every question in that topic regardless
+            // of the other keywords.
+            $whereExpression .= ' AND s.topic_code IN (' . implode(', ', $topicPlaceholders) . ')';
         }
 
-        return [$fromClause, implode(' + ', $scoreParts), implode(' OR ', $whereParts), $params];
+        return [$fromClause, implode(' + ', $scoreParts), $whereExpression, $params];
     }
 
     private function extractWords(string $text): array
