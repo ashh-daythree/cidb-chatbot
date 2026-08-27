@@ -42,18 +42,20 @@ final class ChatbotFaqQuestionRepository extends BaseRepository
      * keywords, ranking rows that hit more keywords higher.
      *
      * @param string[] $keywords
+     * @param string[] $topicCodes
      */
-    public function searchQuestionsByKeywords(array $keywords, int $limit = 10, int $offset = 0): array
+    public function searchQuestionsByKeywords(array $keywords, int $limit = 10, int $offset = 0, array $topicCodes = []): array
     {
         if ($keywords === []) {
             return [];
         }
 
-        [$scoreExpression, $whereExpression, $params] = $this->buildKeywordMatchSql($keywords);
+        [$fromClause, $scoreExpression, $whereExpression, $params] = $this->buildKeywordMatchSql($keywords, $topicCodes);
 
         $sql = sprintf(
-            'SELECT *, (%s) AS match_score FROM chatbot_faq_questions WHERE is_active = true AND (%s) ORDER BY match_score DESC, sort_order ASC LIMIT :limit OFFSET :offset',
+            'SELECT q.*, (%s) AS match_score FROM %s WHERE q.is_active = true AND (%s) ORDER BY match_score DESC, q.sort_order ASC LIMIT :limit OFFSET :offset',
             $scoreExpression,
+            $fromClause,
             $whereExpression
         );
 
@@ -68,17 +70,19 @@ final class ChatbotFaqQuestionRepository extends BaseRepository
 
     /**
      * @param string[] $keywords
+     * @param string[] $topicCodes
      */
-    public function countSearchQuestionsByKeywords(array $keywords): int
+    public function countSearchQuestionsByKeywords(array $keywords, array $topicCodes = []): int
     {
         if ($keywords === []) {
             return 0;
         }
 
-        [, $whereExpression, $params] = $this->buildKeywordMatchSql($keywords);
+        [$fromClause, , $whereExpression, $params] = $this->buildKeywordMatchSql($keywords, $topicCodes);
 
         $sql = sprintf(
-            'SELECT COUNT(*) AS aggregate FROM chatbot_faq_questions WHERE is_active = true AND (%s)',
+            'SELECT COUNT(*) AS aggregate FROM %s WHERE q.is_active = true AND (%s)',
+            $fromClause,
             $whereExpression
         );
 
@@ -97,8 +101,9 @@ final class ChatbotFaqQuestionRepository extends BaseRepository
      * a misspelling like "renewall" still surfaces "Renewal Procedure".
      *
      * @param string[] $keywords
+     * @param string[] $topicCodes
      */
-    public function suggestClosestQuestions(array $keywords, int $limit = 3): array
+    public function suggestClosestQuestions(array $keywords, int $limit = 3, array $topicCodes = []): array
     {
         if ($keywords === []) {
             return [];
@@ -108,6 +113,10 @@ final class ChatbotFaqQuestionRepository extends BaseRepository
         $scored = [];
 
         foreach ($candidates as $row) {
+            if ($topicCodes !== [] && !$this->rowMatchesTopicCodes($row, $topicCodes)) {
+                continue;
+            }
+
             $candidateWords = $this->extractWords(($row['question_en'] ?? '') . ' ' . ($row['question_ms'] ?? ''));
             if ($candidateWords === []) {
                 continue;
@@ -140,26 +149,40 @@ final class ChatbotFaqQuestionRepository extends BaseRepository
 
     /**
      * @param string[] $keywords
-     * @return array{0: string, 1: string, 2: array<string, string>}
+     * @param string[] $topicCodes
+     * @return array{0: string, 1: string, 2: string, 3: array<string, string>}
      */
-    private function buildKeywordMatchSql(array $keywords): array
+    private function buildKeywordMatchSql(array $keywords, array $topicCodes = []): array
     {
         $scoreParts = [];
         $whereParts = [];
         $params = [];
+        $fromClause = 'chatbot_faq_questions q';
 
         foreach (array_values($keywords) as $index => $keyword) {
             $placeholder = 'kw' . $index;
             $params[$placeholder] = '%' . $keyword . '%';
             $matchExpr = sprintf(
-                '(question_en ILIKE :%1$s OR question_ms ILIKE :%1$s OR answer_en ILIKE :%1$s OR answer_ms ILIKE :%1$s)',
+                '(q.question_en ILIKE :%1$s OR q.question_ms ILIKE :%1$s OR q.answer_en ILIKE :%1$s OR q.answer_ms ILIKE :%1$s)',
                 $placeholder
             );
             $scoreParts[] = sprintf('(%s)::int', $matchExpr);
             $whereParts[] = $matchExpr;
         }
 
-        return [implode(' + ', $scoreParts), implode(' OR ', $whereParts), $params];
+        $topicCodes = array_values(array_unique(array_filter(array_map(static fn (string $code): string => strtoupper(trim($code)), $topicCodes))));
+        if ($topicCodes !== []) {
+            $fromClause .= ' INNER JOIN reference_faq_subtopics s ON s.subtopic_code = q.subtopic_code';
+            $topicPlaceholders = [];
+            foreach ($topicCodes as $index => $topicCode) {
+                $placeholder = 'topic' . $index;
+                $topicPlaceholders[] = ':' . $placeholder;
+                $params[$placeholder] = $topicCode;
+            }
+            $whereParts[] = 's.topic_code IN (' . implode(', ', $topicPlaceholders) . ')';
+        }
+
+        return [$fromClause, implode(' + ', $scoreParts), implode(' OR ', $whereParts), $params];
     }
 
     private function extractWords(string $text): array
@@ -170,5 +193,25 @@ final class ChatbotFaqQuestionRepository extends BaseRepository
             array_map('trim', explode(' ', $normalized)),
             static fn (string $word): bool => strlen($word) >= 2
         ));
+    }
+
+    /**
+     * @param string[] $topicCodes
+     */
+    private function rowMatchesTopicCodes(array $row, array $topicCodes): bool
+    {
+        $subtopicCode = strtoupper(trim((string) ($row['subtopic_code'] ?? '')));
+        if ($subtopicCode === '') {
+            return false;
+        }
+
+        foreach ($topicCodes as $topicCode) {
+            $topicCode = strtoupper(trim($topicCode));
+            if ($topicCode !== '' && str_starts_with($subtopicCode, $topicCode . '_')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

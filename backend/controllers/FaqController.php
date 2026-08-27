@@ -75,13 +75,14 @@ final class FaqController extends AbstractController
         }
 
         $keywords = $this->extractSearchKeywords($rawTerm);
+        $topicCodes = $this->extractSearchTopicCodes($rawTerm);
 
-        $questions = $this->questionRepository->searchQuestionsByKeywords($keywords, self::QUESTIONS_PER_PAGE, $offset);
-        $total = $this->questionRepository->countSearchQuestionsByKeywords($keywords);
+        $questions = $this->questionRepository->searchQuestionsByKeywords($keywords, self::QUESTIONS_PER_PAGE, $offset, $topicCodes);
+        $total = $this->questionRepository->countSearchQuestionsByKeywords($keywords, $topicCodes);
 
         $suggestions = [];
         if ($questions === [] && $offset === 0) {
-            $suggestions = $this->questionRepository->suggestClosestQuestions($keywords, 3);
+            $suggestions = $this->questionRepository->suggestClosestQuestions($keywords, 3, $topicCodes);
         }
 
         return $this->success([
@@ -111,5 +112,26 @@ final class FaqController extends AbstractController
         }
 
         return $tokens;
+    }
+
+    /**
+     * @return string[]
+     */
+    private function extractSearchTopicCodes(string $term): array
+    {
+        $normalized = strtolower((string) preg_replace('/[^a-z0-9\s]/i', ' ', $term));
+        $tokens = array_values(array_filter(
+            array_map('trim', explode(' ', $normalized)),
+            static fn (string $token): bool => $token !== ''
+        ));
+
+        $topicCodes = [];
+        foreach (['ppk', 'spkk', 'stb'] as $topicCode) {
+            if (in_array($topicCode, $tokens, true)) {
+                $topicCodes[] = strtoupper($topicCode);
+            }
+        }
+
+        return array_values(array_unique($topicCodes));
     }
 }
