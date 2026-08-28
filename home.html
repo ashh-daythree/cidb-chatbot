@@ -6,7 +6,13 @@
 <title>CIDB Livechat Email ID Cancellation / Pembatalan Email ID</title>
 <style>
   :root {
-    --page-bg: #ffffff;
+    --page-bg: #f8fbfb;
+    --site-teal: #1ea7a1;
+    --site-teal-dark: #14857f;
+    --site-ink: #123236;
+    --site-muted: #6b7f83;
+    --site-surface: rgba(255, 255, 255, 0.92);
+    --site-border: rgba(18, 50, 54, 0.08);
     --chat-bg: #d7eff0;
     --chat-surface: #f8fcfc;
     --chat-header: #cfeaec;
@@ -35,12 +41,153 @@
     --chat-shadow: rgba(15, 29, 31, 0.12);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, sans-serif; background: var(--page-bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-  .chat-wrapper { width: 420px; max-width: 100%; background: var(--chat-bg); border-radius: 12px; box-shadow: 0 4px 20px var(--chat-shadow); display: flex; flex-direction: column; height: 680px; overflow: hidden; }
+  html, body { min-height: 100%; }
+  body {
+    font-family: Arial, sans-serif;
+    background: url("assets/images/cidb-web-bg.png") center top / cover no-repeat fixed #f8fbfb;
+    color: var(--site-ink);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body.chat-widget-open {
+    overflow: hidden;
+  }
+  .live-agent-row {
+    position: fixed;
+    right: 84px;
+    bottom: 18px;
+    z-index: 60;
+  }
+  .live-agent-launch-btn {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    border: none;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #ffb44c, #f3981e);
+    color: #fff;
+    padding: 10px 14px 10px 11px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 14px 28px rgba(243, 152, 30, 0.28);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  }
+  .live-agent-launch-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 18px 32px rgba(243, 152, 30, 0.34);
+  }
+  .live-agent-launch-avatar {
+    width: 39px;
+    height: 39px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.72);
+    background: #fff url("assets/images/avatar.png") center/cover no-repeat;
+    box-shadow: 0 6px 16px rgba(15, 29, 31, 0.16);
+    flex: 0 0 auto;
+  }
+  .live-agent-launch-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    line-height: 1.1;
+  }
+  .live-agent-launch-label {
+    display: block;
+    white-space: nowrap;
+  }
+  .live-agent-launch-subtitle {
+    font-size: 11.5px;
+    font-weight: 600;
+    opacity: 0.94;
+    white-space: nowrap;
+  }
+  .chat-input-area {
+    position: relative;
+  }
+  .live-agent-demo-row {
+    position: absolute;
+    right: 18px;
+    bottom: 86px;
+    z-index: 7;
+    display: flex;
+    justify-content: flex-end;
+    width: auto;
+    pointer-events: auto;
+  }
+  .live-agent-demo-btn {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    border: none;
+    background: transparent;
+    color: var(--chat-primary-dark);
+    padding: 0;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: none;
+    transition: transform 0.18s ease;
+  }
+  .live-agent-demo-btn:hover {
+    transform: translateY(-1px);
+  }
+  .live-agent-demo-label {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 11px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.96);
+    border: 1px solid rgba(24, 167, 160, 0.24);
+    box-shadow: 0 4px 12px rgba(15, 29, 31, 0.05);
+    white-space: nowrap;
+    line-height: 1;
+  }
+  .live-agent-demo-icon {
+    width: 46px;
+    height: 46px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background-color: rgba(255,255,255,0.98);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill='%2318a7a0' d='M24 23c5.25 0 9.5-4.25 9.5-9.5S29.25 4 24 4s-9.5 4.25-9.5 9.5S18.75 23 24 23Zm0 3.5c-7.2 0-21.5 3.6-21.5 10.8V41h43v-3.7c0-7.2-14.3-10.8-21.5-10.8Z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 24px 24px;
+    border: 1px solid rgba(24, 167, 160, 0.22);
+    box-shadow: 0 8px 18px rgba(15, 29, 31, 0.08);
+    flex: 0 0 auto;
+  }
+  .chat-wrapper {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: min(420px, calc(100vw - 32px));
+    height: min(680px, calc(100vh - 32px));
+    max-height: calc(100vh - 32px);
+    background: var(--chat-bg);
+    border-radius: 22px;
+    box-shadow: 0 24px 60px rgba(15, 29, 31, 0.22);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 70;
+    border: 1px solid rgba(255,255,255,0.62);
+  }
+  body.chat-widget-open .chat-wrapper {
+    display: flex;
+  }
+  body.chat-widget-open .live-agent-row {
+    display: none;
+  }
   .chat-header { background: var(--chat-header); color: var(--chat-text); padding: 16px 20px 14px; display: flex; align-items: center; gap: 12px; border-bottom: 4px solid var(--chat-header-line); }
   .chat-header .avatar { width: 40px; height: 40px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; overflow: hidden; box-shadow: 0 1px 6px rgba(15, 29, 31, 0.08); }
   .chat-header .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .chat-header h2 { font-size: 15px; font-weight: 700; color: var(--chat-text); }
+  .chat-header h2 { font-size: 18px; font-weight: 700; color: var(--chat-text); }
   .chat-header p { font-size: 12px; opacity: 0.85; color: var(--chat-muted); }
   .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--chat-bg); }
   .msg { max-width: 82%; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; box-shadow: 0 1px 2px rgba(15, 29, 31, 0.04); }
@@ -138,20 +285,145 @@
   .upload-btn { background: var(--chat-primary); color: #fff; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; cursor: pointer; align-self: stretch; margin-top: 2px; transition: background 0.2s, box-shadow 0.2s; font-weight: 600; }
   .upload-btn:hover:not(:disabled) { background: var(--chat-primary-dark); box-shadow: 0 0 0 3px var(--chat-primary-soft); }
   .upload-btn:disabled { background: #a7b9bb; cursor: default; }
-  .quick-replies { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-  .quick-replies.service-options {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .quick-replies-shell {
+    display: none;
+    position: relative;
+    width: 100%;
+    min-height: 58px;
+  }
+  .quick-replies-shell.has-options {
+    display: block;
+  }
+  .quick-replies-shell.compact-options {
+    min-height: 38px;
+  }
+  .quick-replies-shell.state-options {
+    min-height: 0;
+    padding: 14px 14px 10px;
+    border-top: 1px solid rgba(95, 112, 115, 0.12);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.36), rgba(255,255,255,0.08)),
+      rgba(215, 239, 240, 0.36);
+  }
+  .quick-replies-shell.state-options::before {
+    content: "Please select your state";
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--chat-primary-dark);
+    letter-spacing: 0.01em;
+    margin: 0 0 10px 2px;
+  }
+  .quick-replies-shell.state-options::after {
+    content: none;
+  }
+  .quick-replies {
+    display: flex;
+    flex-wrap: nowrap;
     gap: 6px;
     width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px 28px 2px 2px;
+    scroll-behavior: smooth;
+    scroll-snap-type: x proximity;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .quick-replies::-webkit-scrollbar {
+    display: none;
+  }
+  .quick-replies.compact-options {
+    justify-content: center;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 2px 0;
+    gap: 8px;
+  }
+  .quick-replies.state-options {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    width: 100%;
+    min-height: 0;
+    padding: 2px 62px 2px 2px;
+    gap: 8px;
+  }
+  .quick-replies.service-options {
+    justify-content: flex-start;
     align-items: stretch;
   }
   .qr-btn { background: rgba(255,255,255,0.9); border: 1.5px solid var(--chat-primary); color: var(--chat-primary); border-radius: 16px; padding: 6px 13px; font-size: 12px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
   .qr-btn:hover { background: var(--chat-primary); color: #fff; }
+  .quick-replies .qr-btn {
+    flex: 0 0 auto;
+    white-space: normal;
+    scroll-snap-align: start;
+  }
+  .quick-replies.compact-options .qr-btn {
+    min-width: 0;
+  }
+  .quick-replies.state-options .qr-btn {
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    min-width: 0;
+    padding: 7px 14px;
+    font-size: 11.5px;
+    line-height: 1.15;
+    border-radius: 999px;
+    box-shadow: 0 4px 10px rgba(15, 29, 31, 0.05);
+    white-space: nowrap;
+    background: rgba(255,255,255,0.96);
+    border-color: rgba(24, 167, 160, 0.26);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  }
+  .quick-replies.state-options .qr-btn:hover {
+    background: rgba(24, 167, 160, 0.12);
+    color: var(--chat-primary-dark);
+    border-color: rgba(24, 167, 160, 0.52);
+    box-shadow: 0 8px 18px rgba(15, 29, 31, 0.08);
+    transform: translateY(-1px);
+  }
+  .quick-replies.state-options .qr-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(24, 167, 160, 0.18), 0 8px 18px rgba(15, 29, 31, 0.08);
+  }
+  .quick-replies.state-options .qr-state-icon {
+    width: 13px;
+    height: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--chat-primary-dark);
+    flex: 0 0 auto;
+  }
+  .quick-replies.state-options .qr-state-icon svg {
+    width: 13px;
+    height: 13px;
+    fill: currentColor;
+    stroke: none;
+  }
+  .quick-replies.state-options .qr-state-copy {
+    display: block;
+    min-width: 0;
+  }
+  .quick-replies.state-options .qr-state-title {
+    display: block;
+    min-width: 0;
+  }
   .quick-replies.service-options .qr-btn {
-    width: 100%;
+    flex: 0 0 auto;
+    width: auto;
     min-width: 0;
     min-height: 0;
+    max-width: 210px;
     padding: 8px 10px;
     border-radius: 12px;
     border-color: rgba(24, 167, 160, 0.28);
@@ -210,11 +482,217 @@
     hyphens: none;
   }
   @media (max-width: 420px) {
-    .quick-replies.service-options .qr-btn { padding: 7px 9px; }
-    .quick-replies.service-options .qr-btn[data-value="faq"] { width: 100%; }
+    .quick-replies-shell { min-height: 56px; }
+    .quick-replies.service-options .qr-btn { padding: 7px 9px; max-width: 190px; }
     .quick-replies.service-options .qr-option-title { font-size: 10.5px; }
     .quick-replies.service-options .qr-option-icon { width: 13px; height: 13px; }
     .quick-replies.service-options .qr-option-icon svg { width: 13px; height: 13px; }
+  }
+  .quick-replies-indicator {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 0;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+    background: linear-gradient(90deg, rgba(215, 239, 240, 0), rgba(215, 239, 240, 0.95) 70%, rgba(215, 239, 240, 1));
+    border: none;
+    appearance: none;
+    outline: none;
+    box-shadow: none;
+    border-radius: 999px;
+    transform: translateY(-35%);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .quick-replies-shell.has-more-right .quick-replies-indicator {
+    opacity: 1;
+  }
+  .quick-replies-indicator {
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .quick-replies-indicator:focus-visible {
+    outline: none;
+  }
+  .quick-replies-indicator span {
+    color: var(--chat-primary-dark);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    transform: translateY(-1px);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+  }
+  .quick-replies-indicator:hover span {
+    color: var(--chat-primary);
+  }
+  .live-agent-view {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    background: linear-gradient(180deg, rgba(215, 239, 240, 0.98), rgba(248, 252, 252, 0.98));
+    flex-direction: column;
+  }
+  .chat-wrapper.live-agent-open .live-agent-view {
+    display: flex;
+  }
+  .chat-wrapper.live-agent-open .chat-header,
+  .chat-wrapper.live-agent-open .chat-messages,
+  .chat-wrapper.live-agent-open .chat-input-area {
+    display: none;
+  }
+  .live-agent-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 16px 14px;
+    background: linear-gradient(180deg, rgba(207, 234, 236, 0.96), rgba(207, 234, 236, 0.92));
+    border-bottom: 4px solid var(--chat-header-line);
+  }
+  .live-agent-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .live-agent-badge {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.92);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23137f7a' d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm0 2c-3.33 0-10 1.67-10 5v1h20v-1c0-3.33-6.67-5-10-5Z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 20px 20px;
+    border: 1px solid rgba(24, 167, 160, 0.18);
+    color: var(--chat-primary-dark);
+    box-shadow: 0 1px 6px rgba(15, 29, 31, 0.08);
+    flex: 0 0 auto;
+  }
+  .live-agent-header-copy {
+    min-width: 0;
+  }
+  .live-agent-header-copy h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--chat-text);
+  }
+  .live-agent-header-copy p {
+    font-size: 12px;
+    color: var(--chat-muted);
+  }
+  .live-agent-back-btn {
+    border: 1px solid rgba(24, 167, 160, 0.26);
+    background: rgba(255,255,255,0.92);
+    color: var(--chat-primary-dark);
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(15, 29, 31, 0.05);
+    flex: 0 0 auto;
+  }
+  .live-agent-back-btn:hover {
+    background: rgba(24, 167, 160, 0.10);
+    border-color: rgba(24, 167, 160, 0.48);
+  }
+  .chat-widget-close-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.92);
+    color: var(--chat-primary-dark);
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(15, 29, 31, 0.08);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .chat-widget-close-btn:hover {
+    background: #fff;
+  }
+  .chat-header-actions {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .live-agent-body {
+    flex: 1;
+    padding: 16px 16px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+  }
+  .live-agent-card {
+    background: rgba(255,255,255,0.9);
+    border: 1px solid rgba(24, 167, 160, 0.16);
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 8px 18px rgba(15, 29, 31, 0.06);
+  }
+  .live-agent-card h4 {
+    font-size: 14px;
+    margin-bottom: 8px;
+    color: var(--chat-primary-dark);
+  }
+  .live-agent-note {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--chat-text);
+  }
+  .live-agent-note strong {
+    color: var(--chat-primary-dark);
+  }
+  .live-agent-composer {
+    margin-top: auto;
+    border-top: 1px solid rgba(95, 112, 115, 0.14);
+    padding: 12px 0 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.72));
+  }
+  .live-agent-composer .input-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .live-agent-composer input[type="text"] {
+    flex: 1;
+    border: 1px solid var(--chat-border);
+    border-radius: 20px;
+    padding: 9px 14px;
+    font-size: 13.5px;
+    outline: none;
+    background: rgba(255,255,255,0.92);
+    color: var(--chat-text);
+  }
+  .live-agent-composer input[type="text"]::placeholder {
+    color: #8ca0a3;
+  }
+  .live-agent-composer input[type="text"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.95;
+  }
+  .live-agent-composer .send-btn:disabled {
+    background: #a7b9bb;
+    cursor: default;
+    box-shadow: none;
   }
   .faq-list { display: flex; flex-direction: column; gap: 6px; }
   .faq-item { border: 1px solid var(--chat-border); border-radius: 8px; overflow: hidden; background: rgba(255,255,255,0.7); }
@@ -481,12 +959,24 @@
 </style>
 </head>
 <body>
-<div class="chat-wrapper">
+<div class="live-agent-row">
+<button type="button" class="live-agent-launch-btn" id="liveAgentLaunchBtn" onclick="openChatWidget()">
+<span class="live-agent-launch-avatar" aria-hidden="true"></span>
+<span class="live-agent-launch-copy">
+<span class="live-agent-launch-label">Ask Bena</span>
+<span class="live-agent-launch-subtitle">I'm Ready to Help</span>
+</span>
+</button>
+</div>
+<div class="chat-wrapper" aria-hidden="true">
 <div class="chat-header">
 <div class="avatar"><img src="assets/images/avatar.png" alt="CIDB avatar"></div>
 <div>
-<h2>Bena — CIDB Livechat</h2>
-<p>Email ID Cancellation / Pembatalan Email ID</p>
+<h2>Bena </h2>
+<!--<p>CIDB</p>-->
+</div>
+<div class="chat-header-actions">
+<button type="button" class="chat-widget-close-btn" onclick="closeChatWidget()" aria-label="Close chat">×</button>
 </div>
 </div>
 <div class="chat-messages" id="chatMessages"></div>
@@ -545,11 +1035,47 @@ Edit Name and IC Number
         Submit / Hantar
 </button>
 </div>
+<div class="quick-replies-shell" id="quickRepliesShell">
+<div class="quick-replies" id="quickReplies"></div>
+<button type="button" class="quick-replies-indicator" id="quickRepliesIndicator" aria-label="Show more options"><span>›</span></button>
+</div>
+<div class="live-agent-demo-row">
+<button type="button" class="live-agent-demo-btn" id="liveAgentDemoBtn" onclick="openLiveAgentView()">
+<span class="live-agent-demo-label">Live Agent</span>
+<span class="live-agent-demo-icon" aria-hidden="true"></span>
+</button>
+</div>
 <div class="input-row">
 <input type="text" id="userInput" placeholder="Type a message / Taip mesej anda" onkeydown="if(event.key==='Enter')sendMessage()">
 <button class="send-btn" id="sendBtn" onclick="sendMessage()">&#9658;</button>
 </div>
-<div class="quick-replies" id="quickReplies"></div>
+</div>
+<div class="live-agent-view" id="liveAgentView" aria-hidden="true">
+<div class="live-agent-header">
+<div class="live-agent-title-wrap">
+<div class="live-agent-badge" aria-hidden="true"></div>
+<div class="live-agent-header-copy">
+<h3 id="liveAgentTitle">Live Agent</h3>
+<p id="liveAgentSubtitle">CIDB support desk</p>
+</div>
+</div>
+<div class="chat-header-actions">
+<button type="button" class="live-agent-back-btn" id="liveAgentBackBtn" onclick="closeLiveAgentView()">Back to Chatbot</button>
+<button type="button" class="chat-widget-close-btn" onclick="closeChatWidget()" aria-label="Close chat">×</button>
+</div>
+</div>
+<div class="live-agent-body">
+<div class="live-agent-card">
+<h4 id="liveAgentGreetingTitle">Thank you for contacting CIDB Live Agent.</h4>
+<div class="live-agent-note" id="liveAgentGreetingText">How may I assist you today?</div>
+</div>
+<div class="live-agent-composer">
+<div class="input-row">
+<input type="text" id="liveAgentInput" placeholder="Type a message / Taip mesej anda" disabled aria-disabled="true">
+<button class="send-btn" id="liveAgentSendBtn" disabled aria-disabled="true">&#9658;</button>
+</div>
+</div>
+</div>
 </div>
 </div>
  
