@@ -19,11 +19,19 @@ return [
                 'question_en' => 'What is PPK?', 'answer_en' => 'PPK is the Perakuan Pendaftaran Kontraktor issued by CIDB to registered contractors in Malaysia.',
                 'question_ms' => 'Apakah PPK?', 'answer_ms' => 'PPK ialah Perakuan Pendaftaran Kontraktor yang dikeluarkan oleh CIDB kepada kontraktor yang berdaftar di Malaysia.'],
             ['subtopic_code' => 'PPK_GENERAL', 'sort_order' => 2,
-                'question_en' => 'Do I need to visit a CIDB office to renew my PPK?', 'answer_en' => 'No. PPK renewal can be done online through CIMS CIDB. (link: cims.cidb.gov.my)',
-                'question_ms' => 'Perlukah saya hadir ke pejabat CIDB untuk memperbaharui PPK?', 'answer_ms' => 'Tidak perlu. Pembaharuan PPK boleh dibuat secara dalam talian melalui CIMS CIDB. (link: cims.cidb.gov.my)'],
+                'question_en' => 'Do I need to visit a CIDB office to renew my PPK?', 'answer_en' => 'No. PPK renewal can be done online through CIMS CIDB.
+
+https://cims.cidb.gov.my/',
+                'question_ms' => 'Perlukah saya hadir ke pejabat CIDB untuk memperbaharui PPK?', 'answer_ms' => 'Tidak perlu. Pembaharuan PPK boleh dibuat secara dalam talian melalui CIMS CIDB.
+
+https://cims.cidb.gov.my/'],
             ['subtopic_code' => 'PPK_GENERAL', 'sort_order' => 3,
-                'question_en' => 'Where can I renew my PPK?', 'answer_en' => 'PPK renewal can be done online through CIMS CIDB. (link: cims.cidb.gov.my)',
-                'question_ms' => 'Di manakah saya boleh memperbaharui PPK?', 'answer_ms' => 'Pembaharuan PPK boleh dibuat secara dalam talian melalui CIMS CIDB. (link: cims.cidb.gov.my)'],
+                'question_en' => 'Where can I renew my PPK?', 'answer_en' => 'PPK renewal can be done online through CIMS CIDB.
+
+https://cims.cidb.gov.my/',
+                'question_ms' => 'Di manakah saya boleh memperbaharui PPK?', 'answer_ms' => 'Pembaharuan PPK boleh dibuat secara dalam talian melalui CIMS CIDB.
+
+https://cims.cidb.gov.my/'],
             ['subtopic_code' => 'PPK_GENERAL', 'sort_order' => 4,
                 'question_en' => 'Who needs to apply for PPK?', 'answer_en' => 'Any party carrying out or claiming to carry out construction work in Malaysia, including local and foreign contractors, is subject to CIDB registration requirements.',
                 'question_ms' => 'Siapa yang perlu memohon PPK ini?', 'answer_ms' => 'Mana-mana pihak yang menjalankan atau mengaku menjalankan kerja-kerja pembinaan di Malaysia, termasuk kontraktor tempatan dan kontraktor asing, tertakluk kepada keperluan pendaftaran CIDB.'],
@@ -118,11 +126,37 @@ return [
                 'question_en' => 'How much is the PPK renewal registration fee?', 'answer_en' => "The PPK registration fee depends on the contractor's grade and renewal period. For renewals made before the PPK expires, a 50% discount will be given if there is no grade change.",
                 'question_ms' => 'Berapakah yuran pendaftaran pembaharuan PPK?', 'answer_ms' => 'Yuran pendaftaran PPK bergantung kepada gred kontraktor dan tempoh pembaharuan. Bagi pembaharuan yang dibuat sebelum PPK tamat tempoh, potongan 50% akan diberikan sekiranya tiada perubahan gred dibuat.'],
             ['subtopic_code' => 'PPK_RENEWAL_PROCEDURE', 'sort_order' => 10,
-                'question_en' => 'How much is the registration fee by grade?', 'answer_en' => 'The annual registration fees are as follows: G1: RM20, G2: RM80, G3: RM150, G4: RM350, G5: RM700, G6: RM1,000, and G7: RM1,400. For renewal applications submitted before the PPK expires without a grade change, a 50% discount on the registration fee will be given.',
-                'question_ms' => 'Berapakah yuran pendaftaran mengikut gred?', 'answer_ms' => 'Yuran pendaftaran setahun adalah seperti berikut: G1: RM20, G2: RM80, G3: RM150, G4: RM350, G5: RM700, G6: RM1,000, dan G7: RM1,400. Bagi permohonan pembaharuan yang dibuat sebelum PPK tamat tempoh tanpa perubahan gred, diskaun 50% daripada yuran pendaftaran akan diberikan.'],
+                'question_en' => 'How much is the registration fee by grade?', 'answer_en' => 'The annual registration fees are as follows:
+- G1: RM20
+- G2: RM80
+- G3: RM150
+- G4: RM350
+- G5: RM700
+- G6: RM1,000
+- G7: RM1,400
+
+For renewal applications submitted before the PPK expires without a grade change, a 50% discount on the registration fee will be given.',
+                'question_ms' => 'Berapakah yuran pendaftaran mengikut gred?', 'answer_ms' => 'Yuran pendaftaran setahun adalah seperti berikut:
+- G1: RM20
+- G2: RM80
+- G3: RM150
+- G4: RM350
+- G5: RM700
+- G6: RM1,000
+- G7: RM1,400
+
+Bagi permohonan pembaharuan yang dibuat sebelum PPK tamat tempoh tanpa perubahan gred, diskaun 50% daripada yuran pendaftaran akan diberikan.'],
             ['subtopic_code' => 'PPK_RENEWAL_PROCEDURE', 'sort_order' => 11,
-                'question_en' => 'How do I pay the PPK renewal fee?', 'answer_en' => 'Payment can be made online through the CIMS system. The payment procedure is as follows: 1. Log in to your CIMS ID. 2. Click the Registration button. 3. Under Fees Due, click the invoice number displayed. 4. Select the payment method and proceed with the payment.',
-                'question_ms' => 'Bagaimanakah cara untuk membayar yuran pembaharuan PPK?', 'answer_ms' => 'Bayaran boleh dibuat secara dalam talian melalui sistem CIMS. Tatacara pembayaran adalah seperti berikut: 1. Log masuk ke ID CIMS. 2. Klik butang Pendaftaran. 3. Pada bahagian Fi / Yuran Perlu Dibayar, klik nombor invois yang tertera. 4. Pilih kaedah pembayaran dan teruskan pembayaran.'],
+                'question_en' => 'How do I pay the PPK renewal fee?', 'answer_en' => 'Payment can be made online through the CIMS system. The payment procedure is as follows:
+1. Log in to your CIMS ID.
+2. Click the Registration button.
+3. Under Fees Due, click the invoice number displayed.
+4. Select the payment method and proceed with the payment.',
+                'question_ms' => 'Bagaimanakah cara untuk membayar yuran pembaharuan PPK?', 'answer_ms' => 'Bayaran boleh dibuat secara dalam talian melalui sistem CIMS. Tatacara pembayaran adalah seperti berikut:
+1. Log masuk ke ID CIMS.
+2. Klik butang Pendaftaran.
+3. Pada bahagian Fi / Yuran Perlu Dibayar, klik nombor invois yang tertera.
+4. Pilih kaedah pembayaran dan teruskan pembayaran.'],
             ['subtopic_code' => 'PPK_APPLICATION_DURATION', 'sort_order' => 3,
                 'question_en' => 'How long do I have to pay the processing fee?', 'answer_en' => 'The processing fee must be paid within 7 days from the date the application is submitted. Otherwise, the application will be automatically cancelled.',
                 'question_ms' => 'Berapa lama tempoh yang diberikan untuk membayar yuran pemprosesan?', 'answer_ms' => 'Yuran proses perlu dibayar dalam tempoh 7 hari dari tarikh permohonan dihantar. Jika tidak, permohonan akan dibatalkan secara automatik.'],
@@ -183,8 +217,12 @@ return [
                 'question_en' => 'What is SPKK?', 'answer_en' => 'Certify that SPKK holders are eligible to participate in government construction work procurement in accordance with the prescribed qualifications.',
                 'question_ms' => 'Apa itu SPKK?', 'answer_ms' => 'Memperakukan bahawa pemegang SPKK layak menyertai perolehan kerja kerajaan dalam bidang pembinaan mengikut kelayakan yang ditetapkan.'],
             ['subtopic_code' => 'SPKK_RENEWAL_PROCEDURE', 'sort_order' => 1,
-                'question_en' => 'How can I renew my SPKK?', 'answer_en' => 'To proceed with SPKK renewal, please log in to your CIMS account registered under the company ID. (link: https://cims.cidb.gov.my/)',
-                'question_ms' => 'Bagaimana cara untuk saya membuat Pembaharuan SPKK?', 'answer_ms' => 'Untuk membuat Pembaharuan SPKK, sila log masuk ke akaun CIMS yang berdaftar menggunakan ID syarikat. (link: https://cims.cidb.gov.my/)'],
+                'question_en' => 'How can I renew my SPKK?', 'answer_en' => 'To proceed with SPKK renewal, please log in to your CIMS account registered under the company ID.
+
+https://cims.cidb.gov.my/',
+                'question_ms' => 'Bagaimana cara untuk saya membuat Pembaharuan SPKK?', 'answer_ms' => 'Untuk membuat Pembaharuan SPKK, sila log masuk ke akaun CIMS yang berdaftar menggunakan ID syarikat.
+
+https://cims.cidb.gov.my/'],
             ['subtopic_code' => 'SPKK_GENERAL', 'sort_order' => 2,
                 'question_en' => 'When should SPKK renewal be done?', 'answer_en' => 'The PPK renewal must be completed first. Once the renewed PPK certificate is approved, SPKK renewal can be done when the SPKK certificate has expired.',
                 'question_ms' => 'Bila Pembaharuan SPKK perlu dilakukan?', 'answer_ms' => 'Pembaharuan PPK perlu dilengkapkan terlebih dahulu. Selepas sijil PPK diluluskan, Pembaharuan SPKK boleh dilakukan apabila sijil SPKK telah tamat tempoh.'],
@@ -198,8 +236,30 @@ return [
                 'question_en' => 'Can SPKK renewal be done separately from PPK renewal?', 'answer_en' => 'Yes, it can. Companies are advised to submit the applications in stages, starting with the PPK renewal, followed by the SPKK renewal.',
                 'question_ms' => 'Bolehkah Pembaharuan SPPK dilakukan berasingan dengan Pembaharuan PPK?', 'answer_ms' => 'Ya, boleh. Pihak syarikat disarankan untuk membuat permohonan secara berperingkat, iaitu Pembaharuan PPK terlebih dahulu dan seterusnya diikuti dengan Pembaharuan SPKK.'],
             ['subtopic_code' => 'SPKK_REQUIREMENTS', 'sort_order' => 1,
-                'question_en' => 'What are the requirements for SPKK renewal?', 'answer_en' => "The contractor must ensure that the following requirements are fulfilled for SPKK renewal: 1. The PPK certificate is still valid. 2. The company's paid-up capital must meet the minimum requirement based on its registered grade. For grade G1, the minimum required paid-up capital is RM10,000. 3. A shareholder or individual who already holds an SPKK must not hold more than 5% equity in any other company that also holds an SPKK. 4. Directors, Key Management Personnel, Technical Personnel and Competent Persons of a company holding an SPKK must not be registered or involved in any other company that also holds an SPKK. 5. Score must be at least 3 stars for companies in grades G7 to G5 and at least 2 stars for companies in grades G4 to G2. 6. From 1 January 2027, G7 companies are required to have Anti-Bribery Management System (ABMS) MS 37001 certification for new applications and re-registration of the Government Procurement Works Certificate (SPKK). For the ISO 9001 requirement, Contractor Quality Management System (CQMS) may be accepted as an alternative if the company does not have ISO 9001 certification. Note: Exceptions are given to consortiums, cooperatives, associations and GLCs for Board of Directors or owners. G1 > 20 years: Renewal is limited to a maximum of six (6) years, comprising two (2) renewals of three (3) years each. Thereafter, the company is required to apply for a grade upgrade. G1 < 20 years: Registration may be maintained until the company reaches 26 years of registration, after which the company is required to apply for a grade upgrade. Effective from 2021: G1 renewal requires the company to have at least one qualified technical personnel.",
-                'question_ms' => 'Apakah syarat-syarat untuk pembaharuan SPKK?', 'answer_ms' => 'Pihak kontraktor hendaklah memastikan syarat-syarat berikut dipenuhi bagi Pembaharuan SPKK: 1. Sijil PPK masih sah. 2. Modal berbayar syarikat hendaklah memenuhi jumlah minimum yang ditetapkan mengikut gred syarikat. Bagi gred G1, modal berbayar minimum yang diperlukan ialah RM10,000. 3. Pemegang saham syarikat atau individu yang telah memiliki SPKK tidak boleh memiliki ekuiti melebihi 5% dalam mana-mana syarikat lain yang turut mempunyai SPKK. 4. Pengarah, Pengurusan Utama, Personel Teknikal dan Orang Kompeten bagi syarikat yang mempunyai SPKK tidak boleh didaftarkan atau terlibat dalam mana-mana syarikat lain yang turut mempunyai SPKK. 5. Score hendaklah sekurang-kurangnya 3 bintang bagi syarikat gred G7 hingga G5 dan sekurang-kurangnya 2 bintang bagi syarikat gred G4 hingga G2. 6. Mulai 1 Januari 2027, syarikat G7 diwajibkan memiliki pensijilan Anti-Bribery Management System (ABMS) MS 37001 bagi permohonan baharu dan pendaftaran semula Sijil Perolehan Kerja Kerajaan (SPKK). Bagi keperluan ISO 9001, Contractor Quality Management System (CQMS) boleh diterima sebagai alternatif sekiranya syarikat tidak mempunyai pensijilan ISO 9001. Nota: Pengecualian diberikan kepada konsortium, koperasi, persatuan dan GLC bagi Ahli Lembaga Pengarah atau pemilik. G1 >20 tahun: Pembaharuan maksimum 6 tahun (2 kali x 3 tahun), kemudian wajib naik gred. G1 <20 tahun: Boleh berdaftar sehingga 26 tahun, kemudian wajib naik gred. Mulai 2021: Pembaharuan G1 wajib ada seorang personel teknikal yang berkelayakan.'],
+                'question_en' => 'What are the requirements for SPKK renewal?', 'answer_en' => "The contractor must ensure that the following requirements are fulfilled for SPKK renewal:
+1. The PPK certificate is still valid.
+2. The company's paid-up capital must meet the minimum requirement based on its registered grade. For grade G1, the minimum required paid-up capital is RM10,000.
+3. A shareholder or individual who already holds an SPKK must not hold more than 5% equity in any other company that also holds an SPKK.
+4. Directors, Key Management Personnel, Technical Personnel and Competent Persons of a company holding an SPKK must not be registered or involved in any other company that also holds an SPKK.
+5. Score must be at least 3 stars for companies in grades G7 to G5 and at least 2 stars for companies in grades G4 to G2.
+6. From 1 January 2027, G7 companies are required to have Anti-Bribery Management System (ABMS) MS 37001 certification for new applications and re-registration of the Government Procurement Works Certificate (SPKK). For the ISO 9001 requirement, Contractor Quality Management System (CQMS) may be accepted as an alternative if the company does not have ISO 9001 certification.
+
+Note: Exceptions are given to consortiums, cooperatives, associations and GLCs for Board of Directors or owners.
+- G1 > 20 years: Renewal is limited to a maximum of six (6) years, comprising two (2) renewals of three (3) years each. Thereafter, the company is required to apply for a grade upgrade.
+- G1 < 20 years: Registration may be maintained until the company reaches 26 years of registration, after which the company is required to apply for a grade upgrade.
+- Effective from 2021: G1 renewal requires the company to have at least one qualified technical personnel.",
+                'question_ms' => 'Apakah syarat-syarat untuk pembaharuan SPKK?', 'answer_ms' => 'Pihak kontraktor hendaklah memastikan syarat-syarat berikut dipenuhi bagi Pembaharuan SPKK:
+1. Sijil PPK masih sah.
+2. Modal berbayar syarikat hendaklah memenuhi jumlah minimum yang ditetapkan mengikut gred syarikat. Bagi gred G1, modal berbayar minimum yang diperlukan ialah RM10,000.
+3. Pemegang saham syarikat atau individu yang telah memiliki SPKK tidak boleh memiliki ekuiti melebihi 5% dalam mana-mana syarikat lain yang turut mempunyai SPKK.
+4. Pengarah, Pengurusan Utama, Personel Teknikal dan Orang Kompeten bagi syarikat yang mempunyai SPKK tidak boleh didaftarkan atau terlibat dalam mana-mana syarikat lain yang turut mempunyai SPKK.
+5. Score hendaklah sekurang-kurangnya 3 bintang bagi syarikat gred G7 hingga G5 dan sekurang-kurangnya 2 bintang bagi syarikat gred G4 hingga G2.
+6. Mulai 1 Januari 2027, syarikat G7 diwajibkan memiliki pensijilan Anti-Bribery Management System (ABMS) MS 37001 bagi permohonan baharu dan pendaftaran semula Sijil Perolehan Kerja Kerajaan (SPKK). Bagi keperluan ISO 9001, Contractor Quality Management System (CQMS) boleh diterima sebagai alternatif sekiranya syarikat tidak mempunyai pensijilan ISO 9001.
+
+Nota: Pengecualian diberikan kepada konsortium, koperasi, persatuan dan GLC bagi Ahli Lembaga Pengarah atau pemilik.
+- G1 > 20 tahun: Pembaharuan maksimum 6 tahun (2 kali x 3 tahun), kemudian wajib naik gred.
+- G1 < 20 tahun: Boleh berdaftar sehingga 26 tahun, kemudian wajib naik gred.
+- Mulai 2021: Pembaharuan G1 wajib ada seorang personel teknikal yang berkelayakan.'],
             ['subtopic_code' => 'SPKK_REQUIREMENTS', 'sort_order' => 2,
                 'question_en' => 'Can a joint venture use or renew SPKK?', 'answer_en' => 'No. A joint venture (JV) company is established or used specifically for the project that has been awarded and is not intended to obtain SPKK generally.',
                 'question_ms' => 'Bolehkah syarikat usaha sama menggunakan atau memperbaharui SPKK?', 'answer_ms' => 'Tidak. Syarikat usaha sama (JV) hanya ditubuhkan atau digunakan bagi projek yang telah dianugerahkan sahaja dan bukan untuk mendapatkan SPKK secara umum.'],
@@ -234,8 +294,12 @@ return [
                 'question_en' => 'I changed my company address. Will it affect SPKK renewal?', 'answer_en' => 'No. The change of company address will not affect the SPKK renewal process. However, the company must ensure that the updated address information has been updated in the CIMS system before submitting the renewal application.',
                 'question_ms' => 'Saya telah menukar alamat syarikat. Adakah perubahan tersebut akan menjejaskan pembaharuan SPKK?', 'answer_ms' => 'Tidak. Perubahan alamat syarikat tidak akan menjejaskan proses pembaharuan SPKK. Walau bagaimanapun, pihak syarikat hendaklah memastikan maklumat alamat terkini telah dikemas kini dalam sistem CIMS sebelum mengemukakan permohonan pembaharuan.'],
             ['subtopic_code' => 'SPKK_GENERAL', 'sort_order' => 6,
-                'question_en' => 'How do I check my SPKK renewal status?', 'answer_en' => 'You can check the SPKK renewal status by logging in to CIMS and clicking REGISTRATION > VIEW APPLICATION LIST (link: https://cims.cidb.gov.my/)',
-                'question_ms' => 'Bagaimana cara untuk saya membuat semakan status Pembaharuan SPKK?', 'answer_ms' => 'Semakan status Pembaharuan SPKK boleh dilakukan dengan log masuk CIMS dan klik pada bahagian PENDAFTARAN > klik PAPAR REKOD PERMOHONAN (link: https://cims.cidb.gov.my/)'],
+                'question_en' => 'How do I check my SPKK renewal status?', 'answer_en' => 'You can check the SPKK renewal status by logging in to CIMS and clicking REGISTRATION > VIEW APPLICATION LIST.
+
+https://cims.cidb.gov.my/',
+                'question_ms' => 'Bagaimana cara untuk saya membuat semakan status Pembaharuan SPKK?', 'answer_ms' => 'Semakan status Pembaharuan SPKK boleh dilakukan dengan log masuk CIMS dan klik pada bahagian PENDAFTARAN > klik PAPAR REKOD PERMOHONAN.
+
+https://cims.cidb.gov.my/'],
             ['subtopic_code' => 'SPKK_GENERAL', 'sort_order' => 7,
                 'question_en' => 'Where can I view my SPKK letter or certificate?', 'answer_en' => 'To view the application outcome letter or SPKK certificate, please log in to the CIDB CIMS system and select REGISTRATION > VIEW RESULT & CERTIFICATE',
                 'question_ms' => 'Di manakah saya boleh melihat surat atau sijil SPKK saya?', 'answer_ms' => 'Untuk melihat surat keputusan permohonan atau sijil SPKK, sila log masuk ke sistem CIMS CIDB dan pilih menu PENDAFTARAN > PAPAR KEPUTUSAN/SIJIL'],
@@ -252,8 +316,12 @@ return [
                 'question_en' => 'My payment failed. Can I try again?', 'answer_en' => 'Please first verify whether the previous payment was successful. If the payment failed and no deduction was made, please make the payment again using the payment options available in CIMS. If the amount has been deducted but the payment status remains unclear, the company is advised to wait up to 48 hours for the payment status to be updated.',
                 'question_ms' => 'Pembayaran saya gagal. Bolehkah saya mencuba semula pembayaran?', 'answer_ms' => 'Sila pastikan terlebih dahulu sama ada pembayaran sebelumnya telah berjaya. Sekiranya pembayaran gagal dan tiada sebarang potongan dibuat, sila buat pembayaran semula menggunakan kaedah pembayaran yang tersedia dalam CIMS. Sekiranya wang telah ditolak tetapi status pembayaran masih tidak jelas, pihak syarikat disarankan untuk menunggu 48 jam terlebih dahulu.'],
             ['subtopic_code' => 'SPKK_GENERAL', 'sort_order' => 11,
-                'question_en' => 'Where can I download renewed SPKK certificate?', 'answer_en' => 'To download the certificate for PPK Renewal, the company needs to log in to CIMS portal and select REGISTRATION > VIEW RESULTS/CERTIFICATE (link: https://cims.cidb.gov.my/smis/regcontractor/index.vbhtml)',
-                'question_ms' => 'Di manakah saya boleh memuat turun sijil SPKK yang telah diperbaharui?', 'answer_ms' => 'Untuk memuat turun sijil bagi Pembaharuan PPK, pihak syarikat perlu log masuk ke dalam laman web CIMS dan memilih menu PENDAFTARAN > PAPAR KEPUTUSAN/SIJIL (link: https://cims.cidb.gov.my/smis/regcontractor/index.vbhtml)'],
+                'question_en' => 'Where can I download renewed SPKK certificate?', 'answer_en' => 'To download the certificate for PPK Renewal, the company needs to log in to CIMS portal and select REGISTRATION > VIEW RESULTS/CERTIFICATE.
+
+https://cims.cidb.gov.my/smis/regcontractor/index.vbhtml',
+                'question_ms' => 'Di manakah saya boleh memuat turun sijil SPKK yang telah diperbaharui?', 'answer_ms' => 'Untuk memuat turun sijil bagi Pembaharuan PPK, pihak syarikat perlu log masuk ke dalam laman web CIMS dan memilih menu PENDAFTARAN > PAPAR KEPUTUSAN/SIJIL.
+
+https://cims.cidb.gov.my/smis/regcontractor/index.vbhtml'],
             ['subtopic_code' => 'SPKK_GENERAL', 'sort_order' => 12,
                 'question_en' => 'Can I use an old SPKK certificate after PPK has expired?', 'answer_en' => 'No. The company must first apply for PPK Renewal and ensure that the application has been approved. Subsequently, the company must proceed with the SPKK Renewal application until the application status is approved. Once the SPKK Renewal application is approved, the renewed SPKK certificate may be used.',
                 'question_ms' => 'Bolehkah saya menggunakan sijil SPKK lama selepas PPK tamat tempoh?', 'answer_ms' => 'Tidak boleh. Syarikat perlu membuat Pembaharuan PPK terlebih dahulu dan memastikan permohonan tersebut telah diluluskan. Seterusnya, syarikat perlu meneruskan permohonan Pembaharuan SPKK sehingga status permohonan diluluskan. Setelah permohonan Pembaharuan SPKK diluluskan, sijil SPKK yang baharu boleh digunakan.'],
@@ -306,8 +374,12 @@ return [
                 'question_en' => 'What is SCORE?', 'answer_en' => "SCORE is the Contractor Capability and Capability Assessment Programme developed by CIDB to measure contractors' capability and capacity.",
                 'question_ms' => 'Apa itu SCORE?', 'answer_ms' => 'SCORE ialah Program Penilaian Keupayaan dan Kemampuan Kontraktor yang dibangunkan oleh CIDB untuk mengukur keupayaan dan kemampuan kontraktor.'],
             ['subtopic_code' => 'SPKK_GENERAL', 'sort_order' => 17,
-                'question_en' => 'Why was my SPPK renewal rejected?', 'answer_en' => 'The reason depends on the application. Check the comments in CIMS. Common areas to verify include unmet requirements, invalid/insufficient supporting information or eligibility issues. (link: https://cims.cidb.gov.my/smis/regcontractor/index.vbhtml)',
-                'question_ms' => 'Mengapa permohonan pembaharuan SPPK saya ditolak?', 'answer_ms' => 'Sebab penolakan bergantung kepada permohonan. Semak keputusan atau ulasan dalam CIMS. Antara sebab utama termasuk syarat tidak dipenuhi, dokumen sokongan tidak sah/lengkap atau isu kelayakan. (link: https://cims.cidb.gov.my/smis/regcontractor/index.vbhtml)'],
+                'question_en' => 'Why was my SPPK renewal rejected?', 'answer_en' => 'The reason depends on the application. Check the comments in CIMS. Common areas to verify include unmet requirements, invalid/insufficient supporting information or eligibility issues.
+
+https://cims.cidb.gov.my/smis/regcontractor/index.vbhtml',
+                'question_ms' => 'Mengapa permohonan pembaharuan SPPK saya ditolak?', 'answer_ms' => 'Sebab penolakan bergantung kepada permohonan. Semak keputusan atau ulasan dalam CIMS. Antara sebab utama termasuk syarat tidak dipenuhi, dokumen sokongan tidak sah/lengkap atau isu kelayakan.
+
+https://cims.cidb.gov.my/smis/regcontractor/index.vbhtml'],
             ['subtopic_code' => 'SPKK_GENERAL', 'sort_order' => 18,
                 'question_en' => 'Can my consultant or staff renew PPK for my company?', 'answer_en' => 'No. The PPK renewal must be made using the authorized company account.',
                 'question_ms' => 'Bolehkah perunding saya memperbaharui SPPK untuk syarikat saya?', 'answer_ms' => 'Tidak boleh. Pembaharuan PPK perlu dibuat menggunakan akaun syarikat yang diberi kuasa.'],
@@ -341,8 +413,20 @@ return [
                 'question_en' => 'Is STB the same as PPK?', 'answer_en' => 'No. PPK is CIDB contractor registration while STB concerns Bumiputera-status recognition.',
                 'question_ms' => 'Adakah STB sama dengan PPK?', 'answer_ms' => 'Tidak. PPK ialah pendaftaran kontraktor CIDB manakala STB berkaitan pengiktirafan status Bumiputera.'],
             ['subtopic_code' => 'STB_RENEWAL_PROCEDURE', 'sort_order' => 1,
-                'question_en' => 'How do I renew my STB?', 'answer_en' => 'The following are the steps for STB renewal: 1. Log in using the company ID through the CIMS portal. 2. Click the Registration button. 3. Click STB Renewal. 4. Enter the bank details and cheque signatory information. 5. Upload the relevant documents. 6. Submit the application.',
-                'question_ms' => 'Bagaimanakah cara untuk memperbaharui STB saya?', 'answer_ms' => 'Berikut merupakan tatacara pembaharuan STB: 1. Log masuk ID syarikat melalui portal CIMS 2. Klik butang Pendaftaran 3. Klik Pembaharuan STB 4. Masukkan maklumat bank dan penandatangan cek 5. Sila muat naik dokumen berkaitan 6. Hantar permohonan'],
+                'question_en' => 'How do I renew my STB?', 'answer_en' => 'The following are the steps for STB renewal:
+1. Log in using the company ID through the CIMS portal.
+2. Click the Registration button.
+3. Click STB Renewal.
+4. Enter the bank details and cheque signatory information.
+5. Upload the relevant documents.
+6. Submit the application.',
+                'question_ms' => 'Bagaimanakah cara untuk memperbaharui STB saya?', 'answer_ms' => 'Berikut merupakan tatacara pembaharuan STB:
+1. Log masuk ID syarikat melalui portal CIMS.
+2. Klik butang Pendaftaran.
+3. Klik Pembaharuan STB.
+4. Masukkan maklumat bank dan penandatangan cek.
+5. Sila muat naik dokumen berkaitan.
+6. Hantar permohonan.'],
             ['subtopic_code' => 'STB_GENERAL', 'sort_order' => 6,
                 'question_en' => 'Can I renew STB online?', 'answer_en' => 'Yes, STB renewal can be done online through the CIMS system. Please log in to the CIMS and follow the prescribed renewal steps.',
                 'question_ms' => 'Bolehkah saya memperbaharui STB secara dalam talian?', 'answer_ms' => 'Ya, pembaharuan STB boleh dilakukan secara dalam talian melalui sistem yang disediakan. Sila log masuk ke portal CIMS dan ikuti langkah pembaharuan yang ditetapkan.'],
@@ -362,8 +446,22 @@ return [
                 'question_en' => 'My STB has expired. What should I do?', 'answer_en' => 'If the STB has expired, the company must renew the PPK first. Once the PPK renewal is successfully completed, the company can proceed with the SPKK renewal. The STB renewal can only be carried out after the SPKK renewal is successfully completed.',
                 'question_ms' => 'STB saya telah tamat tempoh. Apakah yang perlu saya lakukan?', 'answer_ms' => 'Jika STB telah tamat tempoh, syarikat perlu memperbaharui PPK terlebih dahulu. Setelah PPK berjaya diperbaharui, syarikat boleh meneruskan pembaharuan SPKK. Selepas SPKK berjaya diperbaharui, barulah pembaharuan STB boleh dibuat.'],
             ['subtopic_code' => 'STB_REQUIREMENTS', 'sort_order' => 1,
-                'question_en' => 'What are the main Bumiputera requirements for STB?', 'answer_en' => 'The main Bumiputera Status requirements are as follows: 1. Bumiputera shareholding: 100% for G1 and at least 51% for G2–G7. 2. Shareholders: Bumiputera shareholders must outnumber non-Bumiputera shareholders. 3. Board of Directors: 100% Bumiputera for G1 and at least 51% for G2–G7. 4. Key positions: The CEO/Managing Director/General Manager must be Bumiputera. 5. Bumiputera employees: 100% for G1 and at least 51% for G2–G7. 6. Financial management, management and organisation must be controlled by Bumiputera. 7. Bumiputera must be actively involved and play a key role in the company',
-                'question_ms' => 'Apakah syarat utama Bumiputera untuk STB?', 'answer_ms' => 'Syarat utama Taraf Bumiputera adalah seperti berikut: 1. Saham Bumiputera: G1 sebanyak 100%, manakala G2–G7 sekurang-kurangnya 51%. 2. Pemegang saham: Pemegang saham Bumiputera mesti melebihi pemegang saham bukan Bumiputera. 3. Lembaga Pengarah: G1 sebanyak 100%, manakala G2–G7 sekurang-kurangnya 51% Bumiputera. 4. Jawatan utama: CEO/Pengarah Urusan/GM mestilah Bumiputera. 5. Pekerja Bumiputera: G1 sebanyak 100%, manakala G2–G7 sekurang-kurangnya 51%. 6. Pengurusan kewangan, pengurusan dan organisasi mestilah dikuasai Bumiputera. 7. Bumiputera mesti terlibat secara aktif dan memainkan peranan utama dalam syarikat.'],
+                'question_en' => 'What are the main Bumiputera requirements for STB?', 'answer_en' => 'The main Bumiputera Status requirements are as follows:
+1. Bumiputera shareholding: 100% for G1 and at least 51% for G2–G7.
+2. Shareholders: Bumiputera shareholders must outnumber non-Bumiputera shareholders.
+3. Board of Directors: 100% Bumiputera for G1 and at least 51% for G2–G7.
+4. Key positions: The CEO/Managing Director/General Manager must be Bumiputera.
+5. Bumiputera employees: 100% for G1 and at least 51% for G2–G7.
+6. Financial management, management and organisation must be controlled by Bumiputera.
+7. Bumiputera must be actively involved and play a key role in the company.',
+                'question_ms' => 'Apakah syarat utama Bumiputera untuk STB?', 'answer_ms' => 'Syarat utama Taraf Bumiputera adalah seperti berikut:
+1. Saham Bumiputera: G1 sebanyak 100%, manakala G2–G7 sekurang-kurangnya 51%.
+2. Pemegang saham: Pemegang saham Bumiputera mesti melebihi pemegang saham bukan Bumiputera.
+3. Lembaga Pengarah: G1 sebanyak 100%, manakala G2–G7 sekurang-kurangnya 51% Bumiputera.
+4. Jawatan utama: CEO/Pengarah Urusan/GM mestilah Bumiputera.
+5. Pekerja Bumiputera: G1 sebanyak 100%, manakala G2–G7 sekurang-kurangnya 51%.
+6. Pengurusan kewangan, pengurusan dan organisasi mestilah dikuasai Bumiputera.
+7. Bumiputera mesti terlibat secara aktif dan memainkan peranan utama dalam syarikat.'],
             ['subtopic_code' => 'STB_REQUIREMENTS', 'sort_order' => 2,
                 'question_en' => 'What Bumiputera shareholding is required for G1 STB?', 'answer_en' => 'The required Bumiputera shareholding for STB G1 is 100%',
                 'question_ms' => 'Berapakah pegangan saham Bumiputera yang diperlukan untuk STB G1?', 'answer_ms' => 'Pegangan saham Bumiputera yang diperlukan untuk STB G1 ialah 100%.'],
@@ -413,14 +511,52 @@ return [
                 'question_en' => 'I changed my company address. Do I need to inform PKK?', 'answer_en' => 'Yes. Any change of CEO or Managing Director must be updated in PKK after the change has been updated with CIDB. This is important as key management is one of the STB eligibility requirements.',
                 'question_ms' => 'Saya telah menukar alamat syarikat. Adakah saya perlu memaklumkan kepada PKK?', 'answer_ms' => 'Ya. Sebarang perubahan CEO atau Pengarah Urusan perlu dikemas kini dalam PKK selepas perubahan tersebut dikemas kini dengan CIDB. Ini penting kerana pengurusan utama merupakan salah satu syarat kelayakan STB.'],
             ['subtopic_code' => 'STB_RENEWAL_PROCEDURE', 'sort_order' => 4,
-                'question_en' => 'When must I report changes to PKK?', 'answer_en' => 'The company must promptly update the information through the Registration Update application in CIMS after any changes are made, while the STB certificate remains valid. (link: cims.cidb.gov.my)',
-                'question_ms' => 'Bilakah saya perlu melaporkan perubahan kepada PKK?', 'answer_ms' => 'Syarikat perlu membuat kemaskini dengan segera melalui permohonan Kemaskini Pendaftaran di CIMS selepas berlaku sebarang perubahan, selagi sijil STB masih dalam tempoh sah laku. (link: cims.cidb.gov.my)'],
+                'question_en' => 'When must I report changes to PKK?', 'answer_en' => 'The company must promptly update the information through the Registration Update application in CIMS after any changes are made, while the STB certificate remains valid.
+
+https://cims.cidb.gov.my/',
+                'question_ms' => 'Bilakah saya perlu melaporkan perubahan kepada PKK?', 'answer_ms' => 'Syarikat perlu membuat kemaskini dengan segera melalui permohonan Kemaskini Pendaftaran di CIMS selepas berlaku sebarang perubahan, selagi sijil STB masih dalam tempoh sah laku.
+
+https://cims.cidb.gov.my/'],
             ['subtopic_code' => 'STB_DOCUMENT_REQUIREMENTS', 'sort_order' => 2,
-                'question_en' => 'What documents are required for STB renewal?', 'answer_en' => 'The documents required for STB renewal are as follows: 1. Identity Card 2. Birth Certificate 3. Premises Location Plan 4. Statutory Declaration under the Statutory Declarations Act 1960, Employment Declaration Form (Appendix 1) 5. Bank Confirmation Letter (Appendix 2) 6. Copy of Contribution Statement, EPF Form A and Payment Receipt 7. Copy of Parent Company Particulars (SSM) 8. Latest Company Organisation Chart. For further information, please click the following link: https://cims.cidb.gov.my/SMIS/regcontractor/DMS/STBSupportDocument/SENARAI%20SEMAK%20BAGI%20PERMOHONAN%20STB%20v2.pdf',
-                'question_ms' => 'Apakah dokumen yang diperlukan untuk pembaharuan STB?', 'answer_ms' => 'Dokumen yang diperlukan untuk memperbaharui STB adalah seperti berikut: 1. Kad Pengenalan 2. Surat Beranak / Sijil Kelahiran 3. Pelan lokasi premis 4. Surat Akuan Sumpah Berkanun Akta 1960, Borang Akuan Pekerjaan (Lampiran 1) 5. Surat Pengesahan Bank (Lampiran 2) 6. Salinan penyata caruman, Borang A KWSP dan resit bayaran 7. Salinan butiran syarikat induk (SSM) 8. Carta organisasi syarikat terkini. Untuk maklumat lanjut, sila rujuk pautan berikut: https://cims.cidb.gov.my/SMIS/regcontractor/DMS/STBSupportDocument/SENARAI%20SEMAK%20BAGI%20PERMOHONAN%20STB%20v2.pdf'],
+                'question_en' => 'What documents are required for STB renewal?', 'answer_en' => 'The documents required for STB renewal are as follows:
+1. Identity Card
+2. Birth Certificate
+3. Premises Location Plan
+4. Statutory Declaration under the Statutory Declarations Act 1960, Employment Declaration Form (Appendix 1)
+5. Bank Confirmation Letter (Appendix 2)
+6. Copy of Contribution Statement, EPF Form A and Payment Receipt
+7. Copy of Parent Company Particulars (SSM)
+8. Latest Company Organisation Chart
+
+For further information, please click the following link:
+https://cims.cidb.gov.my/SMIS/regcontractor/DMS/STBSupportDocument/SENARAI%20SEMAK%20BAGI%20PERMOHONAN%20STB%20v2.pdf',
+                'question_ms' => 'Apakah dokumen yang diperlukan untuk pembaharuan STB?', 'answer_ms' => 'Dokumen yang diperlukan untuk memperbaharui STB adalah seperti berikut:
+1. Kad Pengenalan
+2. Surat Beranak / Sijil Kelahiran
+3. Pelan lokasi premis
+4. Surat Akuan Sumpah Berkanun Akta 1960, Borang Akuan Pekerjaan (Lampiran 1)
+5. Surat Pengesahan Bank (Lampiran 2)
+6. Salinan penyata caruman, Borang A KWSP dan resit bayaran
+7. Salinan butiran syarikat induk (SSM)
+8. Carta organisasi syarikat terkini
+
+Untuk maklumat lanjut, sila rujuk pautan berikut:
+https://cims.cidb.gov.my/SMIS/regcontractor/DMS/STBSupportDocument/SENARAI%20SEMAK%20BAGI%20PERMOHONAN%20STB%20v2.pdf'],
             ['subtopic_code' => 'STB_DOCUMENT_REQUIREMENTS', 'sort_order' => 3,
-                'question_en' => 'Where do I upload STB renewal documents?', 'answer_en' => 'The following are the steps for uploading STB documents: 1. Log in using the company ID through the CIMS portal. 2. Click the Registration button. 3. Click STB Renewal. 4. Enter the bank details and cheque signatory information. 5. Upload the relevant documents. 6. Submit the application.',
-                'question_ms' => 'Di manakah saya perlu memuat naik dokumen pembaharuan STB?', 'answer_ms' => 'Berikut merupakan tatacara muat naik dokumen STB: 1. Log masuk ID syarikat melalui portal CIMS 2. Klik butang Pendaftaran 3. Klik Pembaharuan STB 4. Masukkan maklumat bank dan penandatangan cek 5. Sila muat naik dokumen berkaitan 6. Hantar permohonan'],
+                'question_en' => 'Where do I upload STB renewal documents?', 'answer_en' => 'The following are the steps for uploading STB documents:
+1. Log in using the company ID through the CIMS portal.
+2. Click the Registration button.
+3. Click STB Renewal.
+4. Enter the bank details and cheque signatory information.
+5. Upload the relevant documents.
+6. Submit the application.',
+                'question_ms' => 'Di manakah saya perlu memuat naik dokumen pembaharuan STB?', 'answer_ms' => 'Berikut merupakan tatacara muat naik dokumen STB:
+1. Log masuk ID syarikat melalui portal CIMS.
+2. Klik butang Pendaftaran.
+3. Klik Pembaharuan STB.
+4. Masukkan maklumat bank dan penandatangan cek.
+5. Sila muat naik dokumen berkaitan.
+6. Hantar permohonan.'],
             ['subtopic_code' => 'STB_DOCUMENT_REQUIREMENTS', 'sort_order' => 4,
                 'question_en' => "What happens if I don't upload the required STB documents?", 'answer_en' => 'Failure to upload the required documents can result in the application being declined.',
                 'question_ms' => 'Apakah yang berlaku jika saya tidak memuat naik dokumen STB yang diperlukan?', 'answer_ms' => 'Kegagalan memuat naik dokumen yang diperlukan boleh menyebabkan permohonan gagal.'],
@@ -446,8 +582,12 @@ return [
                 'question_en' => 'System CIMS shows an error when I submit STB renewal. What should I do?', 'answer_en' => 'If an error occurs in the CIMS system during the STB renewal application, please submit an enquiry through CIDB e-Bantuan for further assistance.',
                 'question_ms' => 'Sistem CIMS memaparkan ralat apabila saya menghantar pembaharuan STB. Apakah yang perlu saya lakukan?', 'answer_ms' => 'Sekiranya terdapat ralat pada sistem CIMS semasa permohonan pembaharuan STB, sila kemukakan aduan melalui e-Bantuan CIDB untuk semakan lanjut.'],
             ['subtopic_code' => 'STB_GENERAL', 'sort_order' => 15,
-                'question_en' => 'Why is my STB renewal still pending?', 'answer_en' => 'For STB status-related enquiries, please refer to PKK. Please refer to the following link: https://www.kuskop.gov.my/index.php?id=11&page_id=22&articleid=364',
-                'question_ms' => 'Kenapa pembaharuan STB saya masih dalam proses?', 'answer_ms' => 'Bagi isu semakan status STB, mohon rujuk pihak PKK. Sila rujuk pautan berikut: https://www.kuskop.gov.my/index.php?id=11&page_id=22&articleid=364'],
+                'question_en' => 'Why is my STB renewal still pending?', 'answer_en' => 'For STB status-related enquiries, please refer to PKK.
+
+https://www.kuskop.gov.my/index.php?id=11&page_id=22&articleid=364',
+                'question_ms' => 'Kenapa pembaharuan STB saya masih dalam proses?', 'answer_ms' => 'Bagi isu semakan status STB, mohon rujuk pihak PKK.
+
+https://www.kuskop.gov.my/index.php?id=11&page_id=22&articleid=364'],
             ['subtopic_code' => 'STB_APPLICATION_DURATION', 'sort_order' => 1,
                 'question_en' => 'How long does STB renewal take?', 'answer_en' => 'There is no specified timeframe. For further information and clarification, please refer to PKK.',
                 'question_ms' => 'Berapa lamakah masa yang diperlukan untuk pembaharuan STB?', 'answer_ms' => 'Tiada tempoh yang ditetapkan. Untuk maklumat dan semakan lanjut, sila rujuk pihak PKK.'],
@@ -497,8 +637,12 @@ return [
                 'question_en' => 'Can I use an expired STB for a tender?', 'answer_en' => 'No. Construction work cannot be carried out if the STB certificate has expired.',
                 'question_ms' => 'Bolehkah saya menggunakan STB yang telah tamat tempoh untuk tender?', 'answer_ms' => 'Tidak boleh. Kerja-kerja pembinaan tidak boleh dilaksanakan sekiranya sijil STB telah tempoh.'],
             ['subtopic_code' => 'STB_GENERAL', 'sort_order' => 26,
-                'question_en' => 'Who should I contact if I cannot resolve my STB renewal issue?', 'answer_en' => 'For technical issues, please contact CIDB Careline or submit a form through CIDB e-Bantuan (link: https://www.cidb.gov.my/e-bantuan/)',
-                'question_ms' => 'Siapakah yang perlu saya hubungi jika saya tidak dapat menyelesaikan masalah pembaharuan STB saya?', 'answer_ms' => 'Bagi isu teknikal, sila hubungi CIDB Careline atau isi borang e-Bantuan CIDB (link: https://www.cidb.gov.my/e-bantuan/)'],
+                'question_en' => 'Who should I contact if I cannot resolve my STB renewal issue?', 'answer_en' => 'For technical issues, please contact CIDB Careline or submit a form through CIDB e-Bantuan.
+
+https://www.cidb.gov.my/e-bantuan/',
+                'question_ms' => 'Siapakah yang perlu saya hubungi jika saya tidak dapat menyelesaikan masalah pembaharuan STB saya?', 'answer_ms' => 'Bagi isu teknikal, sila hubungi CIDB Careline atau isi borang e-Bantuan CIDB.
+
+https://www.cidb.gov.my/e-bantuan/'],
             ['subtopic_code' => 'STB_GENERAL', 'sort_order' => 27,
                 'question_en' => 'How do I correct/resubmit my STB application?', 'answer_en' => 'Applicant need to wait for the application to be declined before submitting a new STB renewal application. Please ensure that all required documents are complete and uploaded before submitting the new application.',
                 'question_ms' => 'Bagaimanakah saya boleh membetulkan atau menghantar semula permohonan STB saya?', 'answer_ms' => 'Pemohon perlu menunggu sehingga permohonan ditolak sebelum membuat semula permohonan pembaharuan STB. Sila pastikan semua dokumen yang diperlukan telah lengkap dan dimuat naik sebelum menghantar permohonan baharu.'],

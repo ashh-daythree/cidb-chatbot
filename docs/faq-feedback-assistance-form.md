@@ -6,9 +6,13 @@
 
 Today, once a user expands an FAQ answer, the conversation just sits there — there's no way to tell whether the answer helped, and no path to escalate to a human if it didn't. This feature adds:
 
-1. A **"Did this resolve your query?" Yes/No prompt** under every expanded FAQ answer (topic-browse, subtopic-browse, and search results alike — anywhere `renderFaqQuestionList()` is used).
+1. A **"Did this resolve your query?" Yes/No prompt** under every expanded FAQ answer (anywhere `renderFaqQuestionList()` is used — now only the `ask_faq_enquiry` search results).
 2. **Yes** → the chat ends immediately with a thank-you message.
-3. **No** → an **Assistance Form**, pre-filled from data already collected earlier in the conversation, that the customer fills in and submits; on submit the chat ends with a message telling them they'll be contacted by email within 2 working days.
+3. **No** (or the **"Submit an enquiry"** quick reply) → an **Assistance Form**, pre-filled from the basic details collected right after the user picked FAQ, that the customer completes and submits; on submit the chat ends with a "contacted by email within 2 working days" message.
+
+> **2026-08-28:** the FAQ topic/subtopic menus were removed. The form is now reached
+> via: pick FAQ → give basic details → type enquiry → search results → **No** /
+> **Submit an enquiry**. See `docs/faq-search-feature.md`.
 
 ## Flow
 
@@ -72,6 +76,23 @@ CREATE TABLE chatbot_assistance_requests (
 CREATE INDEX idx_chatbot_assistance_requests_session_id ON chatbot_assistance_requests(session_id);
 ```
 
+**`20260829_add_form_fields_to_assistance_requests.php`** adds the case-classification
+fields (fed to CIMS via the RPA bot) and two more attachment slots:
+
+```sql
+ALTER TABLE chatbot_assistance_requests
+    ADD COLUMN cases_category           VARCHAR(100),   -- e.g. 'Pertanyaan'
+    ADD COLUMN sub_category_1           VARCHAR(150),   -- e.g. 'Pendaftaran Kontraktor'
+    ADD COLUMN sub_category_2           VARCHAR(200),   -- e.g. 'Prosedur pembaharuan PPK/SPKK/STB'
+    ADD COLUMN attachment_document_id_2 UUID REFERENCES uploaded_documents(id),
+    ADD COLUMN attachment_document_id_3 UUID REFERENCES uploaded_documents(id);
+```
+
+`cases_category` / `sub_category_1` / `sub_category_2` are **required** on submit
+(422 if missing). Each currently has a single fixed dropdown option, and the value is
+always stored as the **verbatim Bahasa Malaysia** CIMS string regardless of chat
+language — the RPA bot matches these literally against CIMS dropdowns.
+
 Also seeds a new row into the existing `reference_document_types` table (same `INSERT ... ON CONFLICT (document_type_code) DO NOTHING` pattern as `20260813_add_company_email_id_cancellation_flow.php`):
 
 ```sql
@@ -109,7 +130,12 @@ Request body:
   "id_number": "...",
   "company_name": null,
   "company_registration_no": null,
-  "attachment_document_id": "uuid | null"
+  "cases_category": "Pertanyaan",
+  "sub_category_1": "Pendaftaran Kontraktor",
+  "sub_category_2": "Prosedur pembaharuan PPK/SPKK/STB",
+  "attachment_document_id": "uuid | null",
+  "attachment_document_id_2": "uuid | null",
+  "attachment_document_id_3": "uuid | null"
 }
 ```
 

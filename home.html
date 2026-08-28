@@ -220,18 +220,25 @@
   .faq-item { border: 1px solid var(--chat-border); border-radius: 8px; overflow: hidden; background: rgba(255,255,255,0.7); }
   .faq-question-btn { display: block; width: 100%; text-align: left; background: transparent; border: none; padding: 9px 12px; font-size: 13px; font-weight: 600; color: var(--chat-primary); cursor: pointer; }
   .faq-question-btn:hover { background: var(--chat-primary-soft); }
-  .faq-answer { max-height: 0; overflow: hidden; padding: 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--chat-text); transition: max-height 0.2s ease, padding 0.2s ease; }
-  .faq-answer.open { max-height: 480px; padding: 0 12px 10px; }
+  .faq-answer { max-height: 0; overflow: hidden; padding: 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--chat-text); transition: max-height 0.25s ease, padding 0.25s ease; }
+  .faq-answer.open { max-height: 2600px; padding: 0 12px 10px; }
+  .faq-answer-body > :first-child { margin-top: 0; }
+  .faq-answer-body > :last-child { margin-bottom: 0; }
+  .faq-answer-body p { margin: 7px 0; }
+  .faq-answer-body ol, .faq-answer-body ul { margin: 7px 0; padding-left: 20px; }
+  .faq-answer-body li { margin: 3px 0; }
+  .faq-answer-body a { color: var(--chat-primary); text-decoration: underline; word-break: break-word; }
   .faq-feedback { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--chat-border); display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
   .faq-feedback p { font-size: 11.5px; font-weight: 600; color: var(--chat-muted); flex: 1 0 100%; }
   .faq-feedback-btn { background: rgba(255,255,255,0.9); border: 1.5px solid var(--chat-primary); color: var(--chat-primary); border-radius: 16px; padding: 5px 14px; font-size: 12px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
   .faq-feedback-btn:hover { background: var(--chat-primary); color: #fff; }
   .assistance-form { display: flex; flex-direction: column; gap: 8px; }
   .assistance-form h4 { font-size: 13.5px; color: var(--chat-primary); }
+  .assistance-form h5 { font-size: 12px; color: var(--chat-primary); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.03em; }
   .assistance-prefilled { background: var(--chat-primary-soft); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
   .assistance-prefilled p { font-size: 12px; }
   .assistance-form label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 600; color: var(--chat-muted); }
-  .assistance-form input[type="text"], .assistance-form textarea { border: 1px solid var(--chat-border); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; font-weight: 400; color: var(--chat-text); font-family: inherit; resize: vertical; }
+  .assistance-form input[type="text"], .assistance-form textarea, .assistance-form select { border: 1px solid var(--chat-border); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; font-weight: 400; color: var(--chat-text); font-family: inherit; resize: vertical; background: #fff; }
   .assistance-form input[type="file"] { font-size: 11.5px; }
   .assistance-submit-btn { background: var(--chat-primary); color: #fff; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
   .assistance-submit-btn:hover:not(:disabled) { background: var(--chat-primary-dark); }

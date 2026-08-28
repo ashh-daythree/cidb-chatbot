@@ -12,46 +12,64 @@
 
 ## Summary
 
-Users can now type a keyword or question at any point in the FAQ flow (topic step or subtopic step) and get matching FAQ questions directly, instead of being required to click through the Topic → Subtopic → Question menu. Clicking the quick-reply buttons still works exactly as before — this feature is a fallback for free text, not a replacement for the menu.
+After selecting FAQ from the main menu the bot collects the user's basic details, then
+the user **types their enquiry** and gets the closest matching FAQ answers directly.
+There is no longer any topic (PPK/SPKK/STB) or subtopic menu — free-text search is the
+only path.
+
+> **2026-08-28 — menu removal.** The `ask_faq_topic` and `ask_faq_subtopic` steps, the
+> `POST /session/faq-topic` / `POST /session/faq-subtopic` calls, `GET /faq/topics`, and
+> the paged `GET /faq/subtopics/{code}/questions` browse are all gone from the frontend.
+> A single `ask_faq_enquiry` step replaces them. Backend routes/services for the old
+> menus remain but are dead code.
 
 ## Flow
 
-The FAQ flow is a small state machine driven by `state.step` in `frontend_api.js`, dispatched from `handleStep()`. Before this change, `ask_faq_topic` and `ask_faq_subtopic` only accepted an exact (case-insensitive) match against a menu label/code — anything else was rejected as invalid. This change adds a search fallback at those two steps, without touching the entry point (`ask_service`) or the click-driven exact-match path.
+The FAQ flow is a small state machine driven by `state.step` in `frontend_api.js`,
+dispatched from `handleStep()`.
 
 ```mermaid
 flowchart TD
-    A["ask_service\n(user picks '3. FAQ')"] -->|GET /faq/topics| B["ask_faq_topic\nshow topic list + hint to search"]
-
-    B -->|"click topic label\n(exact match)"| C["POST /session/faq-topic\n-> ask_faq_subtopic"]
-    B -->|"type free text"| B1{"Exact match\na topic label/code?"}
-    B1 -->|yes| C
-    B1 -->|no, NEW| B2["GET /faq/search?q=text"]
-    B2 -->|results found| B3["render results\n(stay on ask_faq_topic)"]
-    B2 -->|no results| B4["'No match' message\n+ re-show topic list"]
-
-    C --> D["ask_faq_subtopic\nshow subtopic list"]
-    D -->|"click subtopic label\n(exact match)"| E["POST /session/faq-subtopic\nrender question list"]
-    D -->|"type free text"| D1{"Exact match a\nsubtopic label/code?"}
-    D1 -->|yes| E
-    D1 -->|no, NEW| D2["GET /faq/search?q=text"]
-    D2 -->|results found| D3["render results\n(stay on ask_faq_subtopic)"]
-    D2 -->|no results| D4["'No match' message\n+ re-show subtopic list"]
-
-    B3 -->|"Back to menu"| A
-    D3 -->|"Back to topics"| B
-    D3 -->|"Back to menu"| A
+    A["ask_service\n(user picks FAQ)"] -->|POST /session/service| C["ask_faq_customer_name … _email\n(name, phone, state, category, email, [company email])"]
+    C --> N["ask_faq_enquiry\n'type your enquiry'"]
+    N -->|"type free text"| S["GET /faq/search?q=text"]
+    S -->|results| R["render top-3 answers (accordion, Yes/No)\nQR: [Submit an enquiry, Back to menu]\n(stay on ask_faq_enquiry)"]
+    S -->|suggestions only| R
+    S -->|no results| R2["'couldn't find a match' message\nQR: [Submit an enquiry, Back to menu]"]
+    R -->|"Yes on an answer"| Z["end chat"]
+    R -->|"No on an answer"| F["render Assistance Form\n(pre-filled from collected details)"]
+    R2 -->|"Submit an enquiry"| F
+    R -->|"Submit an enquiry"| F
+    R -->|"Back to menu"| A
+    F -->|"POST /assistance/submit"| Z
 ```
 
-**Key invariant**: a search never changes `state.step`, `state.faqTopicCode`, or `state.faqSubtopicCode`. It's a read-only detour — the user's position in the menu tree is exactly where they left it, so "Back to topics" / "Back to menu" still resolve correctly after a search.
+**Key invariant**: a search never changes `state.step`. The user stays on
+`ask_faq_enquiry` and can keep typing new queries until they either accept an answer
+(Yes → end) or escalate (No / Submit an enquiry → Assistance Form). `state.faqLastEnquiry`
+holds the most recent query so it can seed the form's enquiry title.
 
 ## Behavior
 
-- **Trigger**: search-on-submit. The user types into the existing chat input box and presses Enter/Send, same as every other step in the flow. There is no live-as-you-type autocomplete.
-- **Scope**: always global. Typing a query searches the entire FAQ knowledge base (`chatbot_faq_questions.question_en`, `question_ms`, `answer_en`, `answer_ms`) regardless of which topic/subtopic the user is currently browsing. Clicking a quick-reply always means "browse this menu"; typing always means "search everything."
-- **Matching**: the raw term is tokenized into keywords (stopwords stripped, `FaqController::extractSearchKeywords`). Each keyword is matched case-insensitively (`ILIKE '%keyword%'`) against the bilingual question and answer columns and contributes to a relevance score; rows are returned best-first. See *Ranking & scoping*.
-- **Result count**: free-text search returns at most 3 rows. Browsing a subtopic via the quick-reply menu still returns 10 per page with a "Next" button.
-- **Fallback order**: when the user types free text at the topic or subtopic step, the system first tries an exact match against the current menu's labels/codes (existing behavior, unchanged). If that fails, it now falls back to a search query. If the search also returns no results, the user sees a "no match" message and is re-shown the current menu.
-- **State**: a global search does not change `state.step`, `state.faqTopicCode`, or `state.faqSubtopicCode` — "Back to topics"/"Back to menu" continue to resolve to wherever the user actually was before searching.
+- **Trigger**: search-on-submit. The user types into the chat input and presses Enter/Send. No live autocomplete.
+- **Scope**: always global — searches the entire FAQ knowledge base (`chatbot_faq_questions.question_en`, `question_ms`, `answer_en`, `answer_ms`). Topic codes named in the query (`ppk`/`spkk`/`stb`) still auto-narrow results (see *Ranking & scoping*).
+- **Matching**: the raw term is tokenized into keywords (stopwords stripped, `FaqController::extractSearchKeywords`). Each keyword is matched case-insensitively (`ILIKE '%keyword%'`) against the bilingual question and answer columns and contributes to a relevance score; rows are returned best-first.
+- **Result count**: free-text search returns at most 3 rows. There is no "Next"/pagination — the tail is intentionally unreachable and routes the user to the Assistance Form instead.
+- **Escalation**: "No" under an answer, or the "Submit an enquiry" quick reply, opens the reworked Assistance Form (`renderAssistanceForm`), pre-filled from the details collected up front. Its enquiry title is the clicked question, or the last typed enquiry.
+- **Frontend-only steps**: `ask_faq_customer_*` and `ask_faq_enquiry` never post to the session API; the only backend calls in the FAQ flow are `POST /session/service`, `GET /faq/search`, and `POST /assistance/submit`.
+
+## Answer formatting
+
+FAQ answers are authored in `backend/migrations/data/faq_content.php` as **plain text** where structure is expressed by convention:
+
+- a **blank line** separates paragraphs
+- lines beginning `1.` / `2.` … become an ordered list (numbered steps)
+- lines beginning `- ` become a bullet list
+- bare `https://…` URLs are turned into links automatically
+
+`renderFaqAnswerHtml()` in `frontend_api.js` converts this to HTML at render time: it **escapes the whole string first** (so authored text can never inject markup — `>` in `CIMS > Registration` is safe), then rebuilds `<p>` / `<ol>` / `<ul>` blocks and linkifies URLs. Output goes into `.faq-answer-body` (styled in `home.html`). The accordion's `max-height` on `.faq-answer.open` was raised so long structured answers are no longer clipped.
+
+The seed migration `20260820_seed_real_faq_content.php` inserts `answer_en` / `answer_ms` verbatim (newlines and all), so re-running that seed is how formatting edits reach the DB.
 
 ## Ranking & scoping
 
