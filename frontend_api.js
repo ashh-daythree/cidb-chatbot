@@ -22,6 +22,8 @@ const quickRepliesEl = document.getElementById('quickReplies');
 const quickRepliesIndicatorEl = document.getElementById('quickRepliesIndicator');
 const liveAgentViewEl = document.getElementById('liveAgentView');
 const liveAgentLaunchBtnEl = document.getElementById('liveAgentLaunchBtn');
+const liveAgentDemoRowEl = document.querySelector('.live-agent-demo-row');
+const chatInputRowEl = document.querySelector('.chat-input-area > .input-row');
 const liveAgentTitleEl = document.getElementById('liveAgentTitle');
 const liveAgentSubtitleEl = document.getElementById('liveAgentSubtitle');
 const liveAgentGreetingTitleEl = document.getElementById('liveAgentGreetingTitle');
@@ -80,6 +82,8 @@ const WAIT_MESSAGES = {
   ],
 };
 
+let liveAgentDockResizeObserver = null;
+
 const SUBMISSION_HOLD_MESSAGE = {
   en: 'We received your request, please hold while we are checking',
   ms: 'Kami telah menerima permintaan anda, sila tunggu sementara kami menyemak',
@@ -101,6 +105,7 @@ const SERVICE_OPTIONS = {
 const state = {
   step: 'booting',
   uiMode: 'chatbot',
+  widgetOpen: false,
   sessionId: null,
   languageCode: null,
   en: true,
@@ -257,12 +262,74 @@ function syncLiveAgentUi() {
   if (liveAgentSubtitleEl) liveAgentSubtitleEl.textContent = ui.subtitle;
   if (liveAgentGreetingTitleEl) liveAgentGreetingTitleEl.textContent = ui.greetingTitle;
   if (liveAgentGreetingTextEl) liveAgentGreetingTextEl.textContent = ui.greetingText;
-  if (liveAgentLaunchBtnEl) {
-    const label = liveAgentLaunchBtnEl.querySelector('.live-agent-launch-label');
-    if (label) label.textContent = 'Live Agent';
-  }
   if (liveAgentBackBtnEl) liveAgentBackBtnEl.textContent = ui.back;
   if (liveAgentTitleEl) liveAgentTitleEl.textContent = state.en ? 'Live Agent' : 'Live Agent';
+}
+
+function updateLiveAgentDockPosition() {
+  if (!liveAgentDemoRowEl || !chatInputRowEl) {
+    return;
+  }
+
+  const quickRepliesVisible = quickRepliesShellEl && getComputedStyle(quickRepliesShellEl).display !== 'none';
+  const uploadVisible = uploadArea && getComputedStyle(uploadArea).display !== 'none';
+  const quickRepliesHeight = quickRepliesVisible ? quickRepliesShellEl.offsetHeight : 0;
+  const uploadHeight = uploadVisible ? uploadArea.offsetHeight : 0;
+  const inputHeight = chatInputRowEl.offsetHeight || 0;
+  const gap = 10;
+  const bottomOffset = Math.max(0, inputHeight + quickRepliesHeight + uploadHeight + gap);
+
+  liveAgentDemoRowEl.style.bottom = `${bottomOffset}px`;
+}
+
+function initLiveAgentDockTracking() {
+  if (liveAgentDockResizeObserver || typeof ResizeObserver === 'undefined') {
+    updateLiveAgentDockPosition();
+    return;
+  }
+
+  liveAgentDockResizeObserver = new ResizeObserver(() => {
+    updateLiveAgentDockPosition();
+  });
+
+  if (quickRepliesShellEl) {
+    liveAgentDockResizeObserver.observe(quickRepliesShellEl);
+  }
+  if (uploadArea) {
+    liveAgentDockResizeObserver.observe(uploadArea);
+  }
+  if (chatInputRowEl) {
+    liveAgentDockResizeObserver.observe(chatInputRowEl);
+  }
+
+  window.addEventListener('resize', updateLiveAgentDockPosition);
+  updateLiveAgentDockPosition();
+}
+
+function setChatWidgetOpen(isOpen) {
+  state.widgetOpen = Boolean(isOpen);
+  if (document?.body) {
+    document.body.classList.toggle('chat-widget-open', state.widgetOpen);
+  }
+  if (chatWrapperEl) {
+    chatWrapperEl.setAttribute('aria-hidden', state.widgetOpen ? 'false' : 'true');
+  }
+}
+
+function openChatWidget() {
+  setChatWidgetOpen(true);
+  state.uiMode = 'chatbot';
+  closeLiveAgentView();
+  updateLiveAgentDockPosition();
+  if (inputEl && typeof inputEl.focus === 'function') {
+    inputEl.focus({ preventScroll: true });
+  }
+}
+
+function closeChatWidget() {
+  closeLiveAgentView();
+  setChatWidgetOpen(false);
+  state.uiMode = 'chatbot';
 }
 
 function openLiveAgentView() {
@@ -270,6 +337,8 @@ function openLiveAgentView() {
     return;
   }
 
+  setChatWidgetOpen(true);
+  updateLiveAgentDockPosition();
   syncLiveAgentUi();
   state.uiMode = 'live-agent';
   if (chatWrapperEl) {
@@ -2510,7 +2579,8 @@ async function bootstrapConversation() {
   state.identityEditEnabled = false;
   updateIdentityEditVisibility();
   syncLiveAgentUi();
-  closeLiveAgentView();
+  closeChatWidget();
+  initLiveAgentDockTracking();
   closeIdentityEditModal();
   closeRetryEditModal();
   setInput(false);
