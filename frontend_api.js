@@ -11,12 +11,22 @@ const MY_STATES = ['Johor', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan', 'P
   'W.P. Kuala Lumpur', 'W.P. Labuan', 'W.P. Putrajaya'];
 
 const messagesEl = document.getElementById('chatMessages');
+const chatWrapperEl = document.querySelector('.chat-wrapper');
 const inputEl = document.getElementById('userInput');
 const sendBtn = document.getElementById('sendBtn');
 const uploadArea = document.getElementById('uploadArea');
 const uploadBtn = document.getElementById('uploadBtn');
 const uploadTitle = document.getElementById('uploadTitle');
+const quickRepliesShellEl = document.getElementById('quickRepliesShell');
 const quickRepliesEl = document.getElementById('quickReplies');
+const quickRepliesIndicatorEl = document.getElementById('quickRepliesIndicator');
+const liveAgentViewEl = document.getElementById('liveAgentView');
+const liveAgentLaunchBtnEl = document.getElementById('liveAgentLaunchBtn');
+const liveAgentTitleEl = document.getElementById('liveAgentTitle');
+const liveAgentSubtitleEl = document.getElementById('liveAgentSubtitle');
+const liveAgentGreetingTitleEl = document.getElementById('liveAgentGreetingTitle');
+const liveAgentGreetingTextEl = document.getElementById('liveAgentGreetingText');
+const liveAgentBackBtnEl = document.getElementById('liveAgentBackBtn');
 const sigOverlay = document.getElementById('sigOverlay');
 const sigCanvas = document.getElementById('sigCanvas');
 const sigUploadBtn = document.getElementById('sigUploadBtn');
@@ -70,17 +80,9 @@ const WAIT_MESSAGES = {
   ],
 };
 
-const DISPLAY_WAIT_MESSAGES = {
-  en: [
-    'Thanks for your patience. We are preparing the final update...',
-    'Almost done. The final message is being loaded now...',
-    'Just a moment longer while we fetch the latest result...',
-  ],
-  ms: [
-    'Terima kasih atas kesabaran anda. Kami sedang menyediakan kemas kini akhir...',
-    'Hampir siap. Mesej akhir sedang dimuatkan sekarang...',
-    'Sila tunggu sebentar lagi sementara kami mendapatkan keputusan terkini...',
-  ],
+const SUBMISSION_HOLD_MESSAGE = {
+  en: 'We received your request, please hold while we are checking',
+  ms: 'Kami telah menerima permintaan anda, sila tunggu sementara kami menyemak',
 };
 
 const SERVICE_OPTIONS = {
@@ -98,6 +100,7 @@ const SERVICE_OPTIONS = {
 
 const state = {
   step: 'booting',
+  uiMode: 'chatbot',
   sessionId: null,
   languageCode: null,
   en: true,
@@ -233,6 +236,58 @@ function syncIdentityEditUi() {
 function updateIdentityEditVisibility() {
   if (!identityEditBtn) return;
   identityEditBtn.style.display = state.identityEditEnabled ? 'inline-flex' : 'none';
+}
+
+function getLiveAgentUi(en = state.en) {
+  return en ? {
+    subtitle: 'CIDB support desk',
+    greetingTitle: 'Thank you for contacting CIDB Live Agent.',
+    greetingText: 'How may I assist you today?',
+    back: 'Back to Chatbot',
+  } : {
+    subtitle: 'Meja bantuan CIDB',
+    greetingTitle: 'Terima kasih kerana menghubungi CIDB Live Agent.',
+    greetingText: 'Bagaimanakah saya boleh membantu anda hari ini?',
+    back: 'Kembali ke Chatbot',
+  };
+}
+
+function syncLiveAgentUi() {
+  const ui = getLiveAgentUi(state.en);
+  if (liveAgentSubtitleEl) liveAgentSubtitleEl.textContent = ui.subtitle;
+  if (liveAgentGreetingTitleEl) liveAgentGreetingTitleEl.textContent = ui.greetingTitle;
+  if (liveAgentGreetingTextEl) liveAgentGreetingTextEl.textContent = ui.greetingText;
+  if (liveAgentLaunchBtnEl) {
+    const label = liveAgentLaunchBtnEl.querySelector('.live-agent-launch-label');
+    if (label) label.textContent = 'Live Agent';
+  }
+  if (liveAgentBackBtnEl) liveAgentBackBtnEl.textContent = ui.back;
+  if (liveAgentTitleEl) liveAgentTitleEl.textContent = state.en ? 'Live Agent' : 'Live Agent';
+}
+
+function openLiveAgentView() {
+  if (!liveAgentViewEl) {
+    return;
+  }
+
+  syncLiveAgentUi();
+  state.uiMode = 'live-agent';
+  if (chatWrapperEl) {
+    chatWrapperEl.classList.add('live-agent-open');
+  }
+  liveAgentViewEl.setAttribute('aria-hidden', 'false');
+}
+
+function closeLiveAgentView() {
+  if (!liveAgentViewEl) {
+    return;
+  }
+
+  state.uiMode = 'chatbot';
+  if (chatWrapperEl) {
+    chatWrapperEl.classList.remove('live-agent-open');
+  }
+  liveAgentViewEl.setAttribute('aria-hidden', 'true');
 }
 
 function getEditableIdentityValues() {
@@ -857,35 +912,16 @@ function startWaitMessageSequence(en) {
 }
 
 function startDisplayMessageWaitSequence(en) {
-  const messages = en ? DISPLAY_WAIT_MESSAGES.en : DISPLAY_WAIT_MESSAGES.ms;
   const bubble = document.createElement('div');
   bubble.className = 'msg bot wait-message';
-  let index = 0;
-  let stopped = false;
-
-  const renderCurrent = () => {
-    bubble.innerHTML = renderBackendMessage(messages[index]);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  };
-
-  renderCurrent();
+  bubble.innerHTML = renderBackendMessage(SUBMISSION_HOLD_MESSAGE[en ? 'en' : 'ms']);
   messagesEl.appendChild(bubble);
   messagesEl.scrollTop = messagesEl.scrollHeight;
-
-  const timer = setInterval(() => {
-    if (stopped) return;
-    index = (index + 1) % messages.length;
-    renderCurrent();
-  }, WAIT_MESSAGE_INTERVAL_MS);
+  const typingBubble = startTypingBubble();
 
   return {
     stop() {
-      if (stopped) {
-        return;
-      }
-      stopped = true;
-      clearInterval(timer);
-      bubble.remove();
+      typingBubble.stop();
     },
   };
 }
@@ -943,6 +979,25 @@ function showTyping(ms = 900) {
   });
 }
 
+function startTypingBubble() {
+  const bubble = document.createElement('div');
+  bubble.className = 'typing';
+  bubble.innerHTML = '<span></span><span></span><span></span>';
+  messagesEl.appendChild(bubble);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  let stopped = false;
+  return {
+    stop() {
+      if (stopped) {
+        return;
+      }
+      stopped = true;
+      bubble.remove();
+    },
+  };
+}
+
 function setInput(on) {
   inputEl.disabled = !on;
   sendBtn.disabled = !on;
@@ -956,6 +1011,66 @@ function isServiceOptionSet(opts) {
       && ['individual', 'company', 'faq'].includes(String(option.value || ''))
       && typeof option.label === 'string');
 }
+
+function isStateOptionSet(opts) {
+  return Array.isArray(opts)
+    && opts.length >= 8
+    && opts.every(option => MY_STATES.includes(String(isPlainObject(option) ? (option.display ?? option.label ?? option.value ?? '') : option).trim()));
+}
+
+let quickRepliesOverflowFrame = null;
+
+function updateQuickRepliesOverflowState() {
+  if (!quickRepliesShellEl || !quickRepliesEl) {
+    return;
+  }
+
+  const hasOptions = quickRepliesEl.children.length > 0;
+  quickRepliesShellEl.classList.toggle('has-options', hasOptions);
+
+  if (!hasOptions) {
+    quickRepliesShellEl.classList.remove('has-more-right');
+    return;
+  }
+
+  const overflow = quickRepliesEl.scrollWidth > quickRepliesEl.clientWidth + 1;
+  const hasMoreRight = overflow && (quickRepliesEl.scrollLeft + quickRepliesEl.clientWidth) < (quickRepliesEl.scrollWidth - 1);
+  quickRepliesShellEl.classList.toggle('has-more-right', hasMoreRight);
+}
+
+function scheduleQuickRepliesOverflowStateUpdate() {
+  if (quickRepliesOverflowFrame !== null) {
+    cancelAnimationFrame(quickRepliesOverflowFrame);
+  }
+
+  quickRepliesOverflowFrame = requestAnimationFrame(() => {
+    quickRepliesOverflowFrame = null;
+    updateQuickRepliesOverflowState();
+  });
+}
+
+if (quickRepliesEl) {
+  quickRepliesEl.addEventListener('scroll', scheduleQuickRepliesOverflowStateUpdate, { passive: true });
+
+  if (typeof MutationObserver !== 'undefined') {
+    const quickRepliesObserver = new MutationObserver(() => scheduleQuickRepliesOverflowStateUpdate());
+    quickRepliesObserver.observe(quickRepliesEl, { childList: true });
+  }
+}
+
+if (quickRepliesIndicatorEl) {
+  quickRepliesIndicatorEl.addEventListener('click', () => {
+    if (!quickRepliesEl) {
+      return;
+    }
+    quickRepliesEl.scrollBy({
+      left: Math.max(180, Math.floor(quickRepliesEl.clientWidth * 0.8)),
+      behavior: 'smooth',
+    });
+  });
+}
+
+window.addEventListener('resize', scheduleQuickRepliesOverflowStateUpdate);
 
 function splitQuickReplyLabel(label) {
   const match = String(label || '').match(/^(\d+)\.\s*(.+)$/);
@@ -993,9 +1108,25 @@ function getServiceOptionIcon(value) {
   return icons[value] || icons.faq;
 }
 
+function getStateLocationIcon() {
+  return `
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11z"></path>
+      <circle cx="12" cy="10" r="2.2"></circle>
+    </svg>
+  `;
+}
+
 function setQR(opts) {
   quickRepliesEl.innerHTML = '';
+  quickRepliesEl.scrollLeft = 0;
+  const stateOptions = isStateOptionSet(opts);
+  const compactOptions = Array.isArray(opts) && opts.length > 0 && opts.length <= 2 && !stateOptions && !isServiceOptionSet(opts);
   quickRepliesEl.classList.toggle('service-options', isServiceOptionSet(opts));
+  quickRepliesEl.classList.toggle('state-options', stateOptions);
+  quickRepliesEl.classList.toggle('compact-options', compactOptions);
+  quickRepliesShellEl.classList.toggle('state-options', stateOptions);
+  quickRepliesShellEl.classList.toggle('compact-options', compactOptions);
   opts.forEach(option => {
     const button = document.createElement('button');
     button.className = 'qr-btn';
@@ -1014,14 +1145,32 @@ function setQR(opts) {
             <span class="qr-option-title">${escapeHtml(parts.title || display)}</span>
           </span>
         `;
+      } else if (quickRepliesEl.classList.contains('state-options')) {
+        button.classList.add('qr-state-option');
+        button.innerHTML = `
+          <span class="qr-state-icon" aria-hidden="true">${getStateLocationIcon()}</span>
+          <span class="qr-state-copy">
+            <span class="qr-state-title">${escapeHtml(display)}</span>
+          </span>
+        `;
       } else {
         button.textContent = display;
       }
     } else {
       const display = String(option);
-      button.textContent = display;
       button.dataset.value = display;
       button.dataset.display = display;
+      if (quickRepliesEl.classList.contains('state-options')) {
+        button.classList.add('qr-state-option');
+        button.innerHTML = `
+          <span class="qr-state-icon" aria-hidden="true">${getStateLocationIcon()}</span>
+          <span class="qr-state-copy">
+            <span class="qr-state-title">${escapeHtml(display)}</span>
+          </span>
+        `;
+      } else {
+        button.textContent = display;
+      }
     }
     button.onclick = () => {
       quickRepliesEl.innerHTML = '';
@@ -1032,10 +1181,12 @@ function setQR(opts) {
     };
     quickRepliesEl.appendChild(button);
   });
+  scheduleQuickRepliesOverflowStateUpdate();
 }
 
 function setQuickReplyAction(label, handler) {
   quickRepliesEl.innerHTML = '';
+  quickRepliesEl.scrollLeft = 0;
   const button = document.createElement('button');
   button.className = 'qr-btn';
   button.textContent = label;
@@ -1048,11 +1199,13 @@ function setQuickReplyAction(label, handler) {
     await handler(button);
   };
   quickRepliesEl.appendChild(button);
+  scheduleQuickRepliesOverflowStateUpdate();
   return button;
 }
 
 function setQuickReplyActions(actions) {
   quickRepliesEl.innerHTML = '';
+  quickRepliesEl.scrollLeft = 0;
   actions.forEach(action => {
     const button = document.createElement('button');
     button.className = 'qr-btn';
@@ -1071,6 +1224,7 @@ function setQuickReplyActions(actions) {
     };
     quickRepliesEl.appendChild(button);
   });
+  scheduleQuickRepliesOverflowStateUpdate();
 }
 
 function persistSubmissionContext(identifier) {
@@ -2326,6 +2480,7 @@ function updateSessionStateFromSession(session) {
 
 async function bootstrapConversation() {
   state.serviceType = 'individual';
+  state.uiMode = 'chatbot';
   state.stateName = '';
   state.stateCode = '';
   state.name = '';
@@ -2354,6 +2509,8 @@ async function bootstrapConversation() {
   state.cancellationRetryInFlight = false;
   state.identityEditEnabled = false;
   updateIdentityEditVisibility();
+  syncLiveAgentUi();
+  closeLiveAgentView();
   closeIdentityEditModal();
   closeRetryEditModal();
   setInput(false);
@@ -3078,7 +3235,7 @@ await addMsg(buildUploadTipHtml(state.en
       state.name = text;
       state.step = 'ask_ic';
       await showTyping(450);
-      await addMsg(state.en ? `Now, <strong>${escapeHtml(text)}</strong>! May I have your <strong>IC / Passport number</strong>?` : `Terima kasih, <strong>${escapeHtml(text)}</strong>! Boleh saya dapatkan <strong>nombor IC / Pasport</strong> anda?`);
+      await addMsg(state.en ? `Thank you, <strong>${escapeHtml(text)}</strong>. May I have your <strong>IC / Passport number</strong>, please?` : `Terima kasih, <strong>${escapeHtml(text)}</strong>. Bolehkah saya dapatkan <strong>nombor IC / Pasport</strong> anda, sila?`);
       setInput(true);
       await refreshSession();
       return;
@@ -3144,8 +3301,8 @@ await addMsg(buildUploadTipHtml(state.en
       state.step = 'ask_email';
       await showTyping(450);
       await addMsg(state.en
-        ? 'Now, kindly provide your <strong>email address</strong>.'
-        : 'Seterusnya, sila berikan <strong>alamat emel</strong> anda.');
+        ? 'May I have your <strong>email address</strong>, please?'
+        : 'Bolehkah saya dapatkan <strong>alamat emel</strong> anda, sila?');
       setInput(true);
       await refreshSession();
       return;
