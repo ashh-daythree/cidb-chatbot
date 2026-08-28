@@ -57,6 +57,9 @@ const WAIT_MESSAGE_INTERVAL_MS = 2400;
 const FINAL_VERIFICATION_TIMEOUT_MS = 10 * 60 * 1000;
 const DEBUG_RPA_FLOW = true;
 const SUBMISSION_CONTEXT_STORAGE_KEY = 'cidb_submission_context';
+const ASSISTANCE_CONTEXT_STORAGE_KEY = 'cidb_assistance_context';
+const ASSISTANCE_POLL_TIMEOUT_MS = 3 * 60 * 1000;
+const ASSISTANCE_POLL_INTERVAL_MS = 2000;
 const WAIT_MESSAGES = {
   en: [
     'Thank you for waiting. We are checking your details now...',
@@ -1874,7 +1877,7 @@ async function submitAssistanceForm(formId) {
     const customerName = state.name;
     const email = state.email;
 
-    await apiRequest('/assistance/submit', {
+    const submitResponse = await apiRequest('/assistance/submit', {
       method: 'POST',
       body: {
         session_id: state.sessionId,
@@ -1889,16 +1892,128 @@ async function submitAssistanceForm(formId) {
         company_name: isCompany ? companyName : null,
         company_registration_no: isCompany ? companyRegNo : null,
         attachment_document_id: attachmentDocumentId,
+        language_code: state.languageCode || (state.en ? 'en' : 'ms'),
       },
     });
 
-    const message = state.en
-      ? 'Thank you. Our team will contact you via email within 2 working days.'
-      : 'Terima kasih. Pasukan kami akan menghubungi anda melalui e-mel dalam tempoh 2 hari bekerja.';
-    endFaqConversation(message);
+    if (formEl) formEl.remove();
+    await resolveAssistanceOutcome(extractData(submitResponse));
   } catch (error) {
     await showApiError(error, state.en ? 'Unable to submit the assistance request.' : 'Tidak dapat menghantar permintaan bantuan.');
     if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+function rememberAssistanceContext(enquiryId) {
+  if (!enquiryId) return;
+  try {
+    localStorage.setItem(ASSISTANCE_CONTEXT_STORAGE_KEY, String(enquiryId));
+  } catch (error) {
+    /* storage unavailable — non-fatal */
+  }
+}
+
+async function resolveAssistanceOutcome(data) {
+  const enquiryId = firstNonEmpty(data?.assistance_request?.id, data?.id);
+  rememberAssistanceContext(enquiryId);
+
+  let outcome = data;
+  const nextAction = firstNonEmpty(data?.next_action, 'done').toLowerCase();
+
+  if (nextAction === 'poll' && enquiryId) {
+    const waiter = startDisplayMessageWaitSequence(state.en);
+    try {
+      outcome = await pollAssistanceStatus(enquiryId);
+    } finally {
+      waiter.stop();
+    }
+  }
+
+  await presentAssistanceOutcome(enquiryId, outcome);
+}
+
+async function pollAssistanceStatus(enquiryId, timeoutMs = ASSISTANCE_POLL_TIMEOUT_MS, intervalMs = ASSISTANCE_POLL_INTERVAL_MS) {
+  const deadline = Date.now() + timeoutMs;
+  let latest = null;
+
+  while (Date.now() <= deadline) {
+    await delay(intervalMs);
+    try {
+      const response = await apiRequest(`/assistance/${encodeURIComponent(enquiryId)}`, { cache: 'no-store' });
+      latest = extractData(response);
+    } catch (error) {
+      continue;
+    }
+    const status = String(latest?.rpa_status || '').toLowerCase();
+    if (status && status !== 'pending') {
+      return latest;
+    }
+  }
+
+  return latest || { rpa_status: 'pending' };
+}
+
+async function presentAssistanceOutcome(enquiryId, data) {
+  const status = String(data?.rpa_status || '').toLowerCase();
+  const caseRef = firstNonEmpty(data?.case_reference_no, data?.assistance_request?.case_reference_no);
+  const shortRef = enquiryId ? String(enquiryId).split('-')[0].toUpperCase() : '';
+
+  if (status === 'logged' && caseRef) {
+    endFaqConversation(state.en
+      ? `Thank you. Your enquiry has been logged. Your case reference number is <strong>${escapeHtml(caseRef)}</strong>.<br>Our team will follow up with you by email within 2 working days. Please quote this reference number in any follow-up.`
+      : `Terima kasih. Pertanyaan anda telah direkodkan. Nombor rujukan kes anda ialah <strong>${escapeHtml(caseRef)}</strong>.<br>Pasukan kami akan menghubungi anda melalui e-mel dalam tempoh 2 hari bekerja. Sila nyatakan nombor rujukan ini dalam sebarang susulan.`);
+    return;
+  }
+
+  if (status === 'logged') {
+    endFaqConversation(state.en
+      ? 'Thank you. Your enquiry has been logged successfully. Our team will follow up with you by email within 2 working days.'
+      : 'Terima kasih. Pertanyaan anda telah berjaya direkodkan. Pasukan kami akan menghubungi anda melalui e-mel dalam tempoh 2 hari bekerja.');
+    return;
+  }
+
+  if (status === 'pending') {
+    endFaqConversation(state.en
+      ? 'Thank you for waiting. Your enquiry has been received and is still being logged in our system. Our team will follow up with you by email within 2 working days.'
+      : 'Terima kasih kerana menunggu. Pertanyaan anda telah diterima dan masih dalam proses direkodkan dalam sistem kami. Pasukan kami akan menghubungi anda melalui e-mel dalam tempoh 2 hari bekerja.');
+    return;
+  }
+
+  // failed / not_triggered — the enquiry is saved; offer a retry.
+  setQR([]);
+  const message = state.en
+    ? `Thank you. Your enquiry has been received and saved${shortRef ? ` (reference <strong>${escapeHtml(shortRef)}</strong>)` : ''}. We're completing the final step and our team will contact you by email within 2 working days.`
+    : `Terima kasih. Pertanyaan anda telah diterima dan disimpan${shortRef ? ` (rujukan <strong>${escapeHtml(shortRef)}</strong>)` : ''}. Kami sedang melengkapkan langkah terakhir dan pasukan kami akan menghubungi anda melalui e-mel dalam tempoh 2 hari bekerja.`;
+  await addMsg(message, 'bot');
+  if (enquiryId) {
+    await addMsg(renderAssistanceRetry(enquiryId));
+  }
+  setInput(false);
+  state.step = 'done';
+}
+
+function renderAssistanceRetry(enquiryId) {
+  const label = state.en ? 'Retry logging my case' : 'Cuba log kes saya semula';
+  return `<div class="assistance-retry">
+    <button type="button" class="assistance-submit-btn" onclick="retryAssistanceLogging('${escapeHtml(String(enquiryId))}')">${escapeHtml(label)}</button>
+  </div>`;
+}
+
+async function retryAssistanceLogging(enquiryId) {
+  if (!enquiryId) return;
+  const waiter = startDisplayMessageWaitSequence(state.en);
+  try {
+    const response = await apiRequest(`/assistance/${encodeURIComponent(enquiryId)}/retry`, { method: 'POST' });
+    let data = extractData(response);
+    if (firstNonEmpty(data?.next_action, 'done').toLowerCase() === 'poll') {
+      data = await pollAssistanceStatus(enquiryId);
+    }
+    waiter.stop();
+    await presentAssistanceOutcome(enquiryId, data);
+  } catch (error) {
+    waiter.stop();
+    await showApiError(error, state.en ? 'Unable to retry right now. Please try again shortly.' : 'Tidak dapat mencuba semula sekarang. Sila cuba sebentar lagi.');
+    await addMsg(renderAssistanceRetry(enquiryId));
   }
 }
 

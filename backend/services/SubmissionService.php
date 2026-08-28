@@ -665,12 +665,16 @@ final class SubmissionService extends AbstractService
 
         if (in_array($outcome, ['norecord', 'error'], true) && $allowRetryOnFailure) {
             $retryMessage = $this->buildCancellationRetryAvailableMessage('individual', (string) ($snapshot['session']['language_code'] ?? 'en'));
+            // Synchronous-failure fallback: no RPA write-back is coming, so the chatbot writes the
+            // same two columns the RPA would, keeping the data-driven retry gate consistent.
+            $this->updateVerificationRetryState((string) ($verification['id'] ?? ''), $retryMessage, true);
 
             return [
                 'mode' => 'retry_available',
                 'verification' => array_merge(is_array($verification) ? $verification : [], [
                     'display_message' => $retryMessage,
                     'response_message' => $retryMessage,
+                    'retry_available' => true,
                 ]),
                 'retry_available' => true,
                 'final_failure_type' => 'cancellation',
@@ -822,12 +826,16 @@ final class SubmissionService extends AbstractService
 
         if ($outcome === 'failed' && $allowRetryOnFailure) {
             $retryMessage = $this->buildCancellationRetryAvailableMessage('company', (string) ($snapshot['session']['language_code'] ?? 'en'));
+            // Synchronous-failure fallback: no RPA write-back is coming, so the chatbot writes the
+            // same two columns the RPA would, keeping the data-driven retry gate consistent.
+            $this->updateVerificationRetryState((string) ($verification['id'] ?? ''), $retryMessage, true);
 
             return [
                 'mode' => 'retry_available',
                 'verification' => array_merge(is_array($verification) ? $verification : [], [
                     'display_message' => $retryMessage,
                     'response_message' => $retryMessage,
+                    'retry_available' => true,
                 ]),
                 'retry_available' => true,
                 'final_failure_type' => 'cancellation',
@@ -909,42 +917,50 @@ final class SubmissionService extends AbstractService
             throw new AppException('Session not found.', 404, 'SESSION_NOT_FOUND');
         }
 
-        $claimedRequest = $this->requestService->claimCancellationRetry((string) ($request['id'] ?? ''));
-        if ($claimedRequest === null) {
-            $currentRequest = $this->requestService->findBySessionId($sessionId) ?? $request;
-            $verification = null;
-            if (!empty($currentRequest['id'])) {
-                $verification = $this->verificationService->latestByRequestId((string) $currentRequest['id']);
-            }
+        $latestVerification = null;
+        if (!empty($request['id'])) {
+            $latestVerification = $this->verificationService->latestByRequestId((string) $request['id']);
+        }
 
-            $status = (string) ($currentRequest['status'] ?? '');
-            if ($status === 'under_review') {
-                return [
-                    'message' => 'Cancellation retry is already running.',
-                    'next_action' => 'poll',
-                    'retry_in_progress' => true,
-                    'retry_available' => false,
-                    'session' => $session,
-                    'request_number' => $currentRequest['request_number'] ?? null,
-                    'request' => $currentRequest,
-                    'verification' => $verification,
-                    'final_failure_type' => null,
-                ];
-            }
+        if ((string) ($request['status'] ?? '') === 'under_review') {
+            return [
+                'message' => 'Cancellation retry is already running.',
+                'next_action' => 'poll',
+                'retry_in_progress' => true,
+                'retry_available' => false,
+                'session' => $session,
+                'request_number' => $request['request_number'] ?? null,
+                'request' => $request,
+                'verification' => $latestVerification,
+                'final_failure_type' => null,
+            ];
+        }
 
+        // Retry is allowed only when the RPA write-back has marked the latest verification row
+        // retry_available = true with a non-empty display_message.
+        $displayMessage = trim((string) ($latestVerification['display_message'] ?? ''));
+        $retryAvailable = filter_var($latestVerification['retry_available'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if (!$retryAvailable || $displayMessage === '') {
             return [
                 'message' => 'Cancellation retry is no longer available.',
                 'next_action' => 'done',
                 'retry_available' => false,
                 'session' => $session,
-                'request_number' => $currentRequest['request_number'] ?? null,
-                'request' => $currentRequest,
-                'verification' => $verification,
+                'request_number' => $request['request_number'] ?? null,
+                'request' => $request,
+                'verification' => $latestVerification,
                 'final_failure_type' => null,
             ];
         }
 
-        $request = $claimedRequest;
+        // Close the gate immediately (column-based double-submit guard) and flag in-progress.
+        if (!empty($latestVerification['id'])) {
+            $this->cimsResultRepository->update((string) $latestVerification['id'], ['retry_available' => false]);
+        }
+        $this->requestService->markUnderReview((string) ($request['id'] ?? ''));
+
+        $nextAttempt = ((int) ($latestVerification['attempt_no'] ?? 1)) + 1;
+
         $snapshot = $this->buildSubmissionSnapshot($sessionId);
         $serviceType = $this->resolveServiceType($snapshot);
         $applicant = null;
@@ -956,8 +972,8 @@ final class SubmissionService extends AbstractService
         }
 
         $flowResult = $serviceType === 'company'
-            ? $this->processCompanyCancellation($snapshot, $request, 2, false)
-            : $this->processIndividualCancellation($snapshot, $applicant, $request, 2, false);
+            ? $this->processCompanyCancellation($snapshot, $request, $nextAttempt, false)
+            : $this->processIndividualCancellation($snapshot, $applicant, $request, $nextAttempt, false);
 
         $documents = $this->documentService->findSessionDocuments($sessionId);
 
@@ -1137,6 +1153,18 @@ final class SubmissionService extends AbstractService
 
         $this->cimsResultRepository->update($verificationId, [
             'display_message' => $message,
+        ]);
+    }
+
+    private function updateVerificationRetryState(string $verificationId, string $message, bool $retryAvailable): void
+    {
+        if ($verificationId === '') {
+            return;
+        }
+
+        $this->cimsResultRepository->update($verificationId, [
+            'display_message' => $message,
+            'retry_available' => $retryAvailable,
         ]);
     }
 

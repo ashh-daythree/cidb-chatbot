@@ -87,7 +87,11 @@ final class SubmissionController extends AbstractController
 
         $retryState = $this->resolveRetryState($submission, $verification);
         $nextAction = 'done';
-        if (is_array($verification) && strtolower(trim((string) ($verification['result_status'] ?? ''))) === 'pending') {
+        if ($retryState['retry_in_progress']) {
+            $nextAction = 'poll';
+        } elseif ($retryState['retry_available']) {
+            $nextAction = 'retry_available';
+        } elseif (is_array($verification) && strtolower(trim((string) ($verification['result_status'] ?? ''))) === 'pending') {
             $nextAction = 'poll';
         }
 
@@ -122,13 +126,9 @@ final class SubmissionController extends AbstractController
      */
     private function resolveRetryState(array $submission, ?array $verification): array
     {
-        $requestStatus = (string) ($submission['status'] ?? '');
-        $latestStatus = (string) ($submission['latest_cims_status'] ?? '');
-        $attemptNo = (int) ($verification['attempt_no'] ?? 0);
-        $retryable = in_array($latestStatus, ['norecord', 'error', 'failed'], true);
-        $hasFinalState = in_array($requestStatus, ['failed', 'approved', 'manual_review', 'rejected', 'completed'], true);
-
-        if ($requestStatus === 'under_review') {
+        // Retry eligibility is data-driven: the RPA write-back sets display_message +
+        // retry_available on the latest cims_verification_results row. The chatbot only reads them.
+        if ((string) ($submission['status'] ?? '') === 'under_review') {
             return [
                 'retry_available' => false,
                 'retry_in_progress' => true,
@@ -136,7 +136,10 @@ final class SubmissionController extends AbstractController
             ];
         }
 
-        if ($requestStatus === 'submitted' && $retryable && $attemptNo <= 1) {
+        $displayMessage = trim((string) ($verification['display_message'] ?? ''));
+        $retryAvailable = filter_var($verification['retry_available'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        if ($retryAvailable && $displayMessage !== '') {
             return [
                 'retry_available' => true,
                 'retry_in_progress' => false,
@@ -147,7 +150,7 @@ final class SubmissionController extends AbstractController
         return [
             'retry_available' => false,
             'retry_in_progress' => false,
-            'retry_reason' => $hasFinalState ? 'Cancellation has already reached a terminal state.' : null,
+            'retry_reason' => null,
         ];
     }
 }

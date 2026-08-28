@@ -179,6 +179,18 @@ return [
         'action' => 'submit',
     ],
     [
+        'method' => 'GET',
+        'path' => '/assistance/{id}',
+        'controller' => AssistanceController::class,
+        'action' => 'show',
+    ],
+    [
+        'method' => 'POST',
+        'path' => '/assistance/{id}/retry',
+        'controller' => AssistanceController::class,
+        'action' => 'retry',
+    ],
+    [
         'method' => 'POST',
         'path' => '/signature/upload',
         'controller' => SignatureController::class,

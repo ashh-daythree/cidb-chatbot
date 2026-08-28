@@ -58,6 +58,29 @@ final class RpaBotService
     }
 
     /**
+     * Logs a FAQ assistance-form enquiry as a case via the RPA ticket-insert bot.
+     *
+     * @param array<string, mixed> $payload
+     * @return array{
+     *     success: bool,
+     *     status_code: int,
+     *     raw_response_text: string,
+     *     parsed_response: array<string, mixed>|null,
+     *     duration_ms: int,
+     *     error_message: ?string
+     * }
+     */
+    public function triggerEnquiryLog(array $payload): array
+    {
+        $endpoint = trim((string) EnvironmentLoader::get('RPA_ENQUIRY_ENDPOINT', ''));
+        if ($endpoint === '') {
+            $endpoint = trim((string) EnvironmentLoader::get('RPA_BOT_ENDPOINT', self::DEFAULT_ENDPOINT));
+        }
+
+        return $this->triggerAtEndpoint($endpoint, $payload, 'Enquiry RPA bot API');
+    }
+
+    /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
