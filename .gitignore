@@ -5,3 +5,4 @@ backend/uploads/
 ocr/.venv/
 ocr/.env
 ocr/**/__pycache__/
+ocr/ocr_service.log

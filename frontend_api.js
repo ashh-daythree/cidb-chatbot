@@ -87,12 +87,12 @@ const SERVICE_OPTIONS = {
   en: [
     { value: 'individual', label: '1. Individual Email ID Cancellation' },
     { value: 'company', label: '2. Company Email ID Cancellation' },
-    { value: 'faq', label: '3. FAQ' },
+    { value: 'faq', label: '3. PPK/SPKK/STB Renewal Process' },
   ],
   ms: [
     { value: 'individual', label: '1. Pembatalan Email ID Individu' },
     { value: 'company', label: '2. Pembatalan Email ID Syarikat' },
-    { value: 'faq', label: '3. Soalan Lazim' },
+    { value: 'faq', label: '3. Proses Pembaharuan PPK/SPKK/STB' },
   ],
 };
 
@@ -121,6 +121,9 @@ const state = {
   faqSubtopics: [],
   faqSubtopicCode: '',
   faqQuestionOffset: 0,
+  faqEnquiryTitle: '',
+  faqSelectedTopic: null,
+  faqApplicantCategory: '',
   sigDataUrl: null,
   uploads: { front: null, back: null, certificate: null, signature: null },
   files: { front: null, back: null, certificate: null, signature: null },
@@ -945,22 +948,85 @@ function setInput(on) {
   sendBtn.disabled = !on;
 }
 
+function isServiceOptionSet(opts) {
+  return Array.isArray(opts)
+    && opts.length === 3
+    && opts.every(option =>
+      isPlainObject(option)
+      && ['individual', 'company', 'faq'].includes(String(option.value || ''))
+      && typeof option.label === 'string');
+}
+
+function splitQuickReplyLabel(label) {
+  const match = String(label || '').match(/^(\d+)\.\s*(.+)$/);
+  if (match) {
+    return { title: match[2] };
+  }
+  return { title: String(label || '') };
+}
+
+function getServiceOptionIcon(value) {
+  const icons = {
+    individual: `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="8" r="3.2"></circle>
+        <path d="M5.5 19c.7-3.1 3.1-4.8 6.5-4.8s5.8 1.7 6.5 4.8"></path>
+      </svg>
+    `,
+    company: `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4.5 19.5h15"></path>
+        <path d="M6.5 19.5V6.8h5.2v12.7"></path>
+        <path d="M11.7 19.5V4.5h5.8v15"></path>
+        <path d="M8.1 9.2h1.2M8.1 12h1.2M8.1 14.8h1.2M13.2 7.4h1.2M13.2 10.2h1.2M13.2 13h1.2M13.2 15.8h1.2"></path>
+      </svg>
+    `,
+    faq: `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M6.5 4.8h8.9L18.5 8v11.2H6.5z"></path>
+        <path d="M15.4 4.8V8h3.1"></path>
+        <path d="M9.4 12.1c.2-1.5 1.4-2.5 2.8-2.5 1.3 0 2.3.8 2.3 2 0 1.1-.8 1.6-1.7 2-.8.3-1.2.8-1.2 1.6"></path>
+        <circle cx="12.6" cy="17.5" r="0.9"></circle>
+      </svg>
+    `,
+  };
+  return icons[value] || icons.faq;
+}
+
 function setQR(opts) {
   quickRepliesEl.innerHTML = '';
+  quickRepliesEl.classList.toggle('service-options', isServiceOptionSet(opts));
   opts.forEach(option => {
     const button = document.createElement('button');
     button.className = 'qr-btn';
     if (isPlainObject(option)) {
-      button.textContent = option.label ?? option.text ?? option.value ?? '';
-      button.dataset.value = String(option.value ?? option.label ?? '');
+      const label = String(option.label ?? option.text ?? option.value ?? '');
+      const display = String(option.display ?? label);
+      const value = String(option.value ?? option.label ?? '');
+      button.dataset.value = value;
+      button.dataset.display = display;
+      if (quickRepliesEl.classList.contains('service-options')) {
+        const parts = splitQuickReplyLabel(label);
+        button.classList.add('qr-option');
+        button.innerHTML = `
+          <span class="qr-option-icon" aria-hidden="true">${getServiceOptionIcon(value)}</span>
+          <span class="qr-option-copy">
+            <span class="qr-option-title">${escapeHtml(parts.title || display)}</span>
+          </span>
+        `;
+      } else {
+        button.textContent = display;
+      }
     } else {
-      button.textContent = option;
-      button.dataset.value = String(option);
+      const display = String(option);
+      button.textContent = display;
+      button.dataset.value = display;
+      button.dataset.display = display;
     }
     button.onclick = () => {
       quickRepliesEl.innerHTML = '';
       pendingQuickReplyValue = button.dataset.value || null;
-      pendingQuickReplyDisplay = button.textContent || '';
+      pendingQuickReplyDisplay = button.dataset.display || button.textContent || '';
       inputEl.value = pendingQuickReplyDisplay;
       sendMessage();
     };
@@ -1506,6 +1572,25 @@ function buildServicePayload(text) {
   return null;
 }
 
+function isRenewalFaqQuery(text) {
+  const value = String(text || '').trim().toLowerCase();
+  if (!value) {
+    return false;
+  }
+
+  return [
+    'ppk',
+    'spkk',
+    'stb',
+    'renewal',
+    'renew',
+    'pembaharuan',
+    'perbaharui',
+    'mcore',
+    'score',
+  ].some(keyword => value.includes(keyword));
+}
+
 function getServiceQuickReplies() {
   return state.en ? SERVICE_OPTIONS.en : SERVICE_OPTIONS.ms;
 }
@@ -1527,6 +1612,17 @@ function buildFaqTopicPayload(text) {
   return match ? { topic_code: match.topic_code, topic: match } : null;
 }
 
+function faqApplicantCategoryOptions() {
+  return state.en ? ['Individual', 'Company'] : ['Individu', 'Syarikat'];
+}
+
+function buildFaqApplicantCategoryPayload(text) {
+  const value = String(text || '').trim().toLowerCase();
+  if (['individual', 'individu'].includes(value)) return { category: 'individual' };
+  if (['company', 'syarikat'].includes(value)) return { category: 'company' };
+  return null;
+}
+
 function faqSubtopicLabel(subtopic) {
   return state.en ? (subtopic.label_en || subtopic.subtopic_code) : (subtopic.label_ms || subtopic.subtopic_code);
 }
@@ -1544,17 +1640,96 @@ function buildFaqSubtopicPayload(text) {
   return match ? { subtopic_code: match.subtopic_code, subtopic: match } : null;
 }
 
+async function searchFaqQuestions(term, offset = 0) {
+  const response = await apiRequest(`/faq/search?q=${encodeURIComponent(term)}&offset=${offset}`, { cache: 'no-store' });
+  return extractData(response);
+}
+
+async function routeRenewalQueryToFaq(text) {
+  const response = await apiRequest('/session/service', {
+    method: 'POST',
+    body: { session_id: state.sessionId, service_type: 'faq' },
+  });
+  const data = extractData(response);
+  updateSessionStateFromSession(isPlainObject(data.session) ? data.session : data);
+  state.serviceType = 'faq';
+  state.step = 'ask_faq_topic';
+  state.faqTopicCode = '';
+  state.faqSubtopics = [];
+  state.faqSubtopicCode = '';
+  state.faqQuestionOffset = 0;
+  state.faqEnquiryTitle = '';
+  state.faqSelectedTopic = null;
+  state.faqApplicantCategory = '';
+
+  const topicsResponse = await apiRequest('/faq/topics', { method: 'GET' });
+  const topicsData = extractData(topicsResponse);
+  state.faqTopics = Array.isArray(topicsData.topics) ? topicsData.topics : [];
+
+  const searchData = await searchFaqQuestions(text);
+  const questions = Array.isArray(searchData.questions) ? searchData.questions : [];
+  const suggestions = Array.isArray(searchData.suggestions) ? searchData.suggestions : [];
+
+  if (questions.length > 0) {
+    await showTyping(300);
+    await addMsg(faqSearchIntroMessage());
+    await addMsg(renderFaqQuestionList(questions));
+    setQR([state.en ? 'Back to menu' : 'Kembali ke menu']);
+    setInput(true);
+    await refreshSession();
+    return true;
+  }
+
+  if (suggestions.length > 0) {
+    await showTyping(300);
+    await addMsg(state.en ? 'No exact match found. Did you mean one of these?' : 'Tiada padanan tepat dijumpai. Adakah anda maksudkan salah satu daripada ini?');
+    await addMsg(renderFaqQuestionList(suggestions));
+    setQR([state.en ? 'Back to menu' : 'Kembali ke menu']);
+    setInput(true);
+    await refreshSession();
+    return true;
+  }
+
+  await showTyping(300);
+  await addMsg(state.en ? 'Please choose an FAQ topic, or type a keyword to search directly:' : 'Sila pilih topik Soalan Lazim, atau taip kata kunci untuk mencari terus:');
+  setQR(faqTopicOptions());
+  setInput(true);
+  await refreshSession();
+  return true;
+}
+
 let faqAnswerIdCounter = 0;
+const faqAnswerQuestionText = {};
+
+// Free-text search now returns only the top 3 most relevant questions. This
+// line sets that expectation and points users who don't see their answer at the
+// "No" feedback button, which opens the assistance form.
+function faqSearchIntroMessage() {
+  return state.en
+    ? 'Here are the closest matches to your question. If none of them help, tap <strong>No</strong> under an answer to send us an enquiry.'
+    : 'Berikut ialah padanan paling hampir dengan soalan anda. Jika tiada yang membantu, ketik <strong>Tidak</strong> di bawah sesuatu jawapan untuk menghantar pertanyaan kepada kami.';
+}
 
 function renderFaqQuestionList(questions) {
+  const feedbackPrompt = state.en ? 'Did this resolve your query?' : 'Adakah ini menyelesaikan pertanyaan anda?';
+  const yesLabel = state.en ? 'Yes' : 'Ya';
+  const noLabel = state.en ? 'No' : 'Tidak';
   const itemsHtml = questions.map(question => {
     faqAnswerIdCounter += 1;
     const answerId = `faq-answer-${faqAnswerIdCounter}`;
     const questionText = state.en ? (question.question_en || '') : (question.question_ms || '');
     const answerText = state.en ? (question.answer_en || '') : (question.answer_ms || '');
+    faqAnswerQuestionText[answerId] = questionText;
     return `<div class="faq-item">
       <button type="button" class="faq-question-btn" onclick="toggleFaqAnswer('${answerId}')">${escapeHtml(questionText)}</button>
-      <div class="faq-answer" id="${answerId}">${escapeHtml(answerText)}</div>
+      <div class="faq-answer" id="${answerId}">
+        ${escapeHtml(answerText)}
+        <div class="faq-feedback">
+          <p>${escapeHtml(feedbackPrompt)}</p>
+          <button type="button" class="faq-feedback-btn" onclick="handleFaqFeedback(true, '${answerId}')">${escapeHtml(yesLabel)}</button>
+          <button type="button" class="faq-feedback-btn" onclick="handleFaqFeedback(false, '${answerId}')">${escapeHtml(noLabel)}</button>
+        </div>
+      </div>
     </div>`;
   }).join('');
   return `<div class="faq-list">${itemsHtml}</div>`;
@@ -1564,6 +1739,185 @@ function toggleFaqAnswer(answerId) {
   const el = document.getElementById(answerId);
   if (!el) return;
   el.classList.toggle('open');
+}
+
+function endFaqConversation(message) {
+  setQR([]);
+  addMsg(message, 'bot').then(() => {
+    setInput(false);
+    state.step = 'done';
+  });
+}
+
+async function finishFaqCustomerInfoCollection() {
+  state.step = 'ask_faq_subtopic';
+  await showTyping(400);
+  await addMsg(state.en
+    ? `Here are the subtopics under <strong>${escapeHtml(faqTopicLabel(state.faqSelectedTopic || {}))}</strong>:`
+    : `Berikut ialah subtopik di bawah <strong>${escapeHtml(faqTopicLabel(state.faqSelectedTopic || {}))}</strong>:`);
+  setQR(faqSubtopicOptions());
+  setInput(true);
+}
+
+async function handleFaqFeedback(resolved, answerId) {
+  if (resolved) {
+    const customerName = state.name;
+    const message = state.en
+      ? `Thank you, ${escapeHtml(customerName || '')}, for using CIDB BENA Chat.<br>Your chat session has ended.`
+      : `Terima kasih, ${escapeHtml(customerName || '')}, kerana menggunakan CIDB BENA Chat.<br>Sesi chat anda telah tamat.`;
+    endFaqConversation(message);
+    return;
+  }
+
+  state.faqEnquiryTitle = faqAnswerQuestionText[answerId] || '';
+  await addMsg(renderAssistanceForm());
+}
+
+let assistanceFormIdCounter = 0;
+
+function renderAssistanceForm() {
+  assistanceFormIdCounter += 1;
+  const formId = `assistance-form-${assistanceFormIdCounter}`;
+  const isCompany = state.faqApplicantCategory === 'company';
+  const customerName = state.name;
+  const email = state.email;
+
+  const labels = state.en ? {
+    title: 'Assistance Form',
+    state: 'State',
+    customerName: 'Customer Name',
+    category: 'Applicant Category',
+    phone: 'Phone Number',
+    email: 'Email Address',
+    enquiryTitle: 'Enquiry Title',
+    enquiryDescription: 'Enquiry Description',
+    idNumber: 'MyKad / Passport No.',
+    companyName: 'Company Name',
+    companyRegNo: 'Company Registration No.',
+    attachment: 'Supporting Documents (optional)',
+    submit: 'Submit',
+    individual: 'Individual',
+    company: 'Company',
+  } : {
+    title: 'Borang Bantuan',
+    state: 'Negeri',
+    customerName: 'Nama Pelanggan',
+    category: 'Kategori Pemohon',
+    phone: 'Nombor Telefon',
+    email: 'Alamat E-mel',
+    enquiryTitle: 'Tajuk Pertanyaan',
+    enquiryDescription: 'Keterangan Pertanyaan',
+    idNumber: 'No. MyKad / Pasport',
+    companyName: 'Nama Syarikat',
+    companyRegNo: 'No. Pendaftaran Syarikat',
+    attachment: 'Dokumen Sokongan (pilihan)',
+    submit: 'Hantar',
+    individual: 'Individu',
+    company: 'Syarikat',
+  };
+
+  const companyFieldsHtml = isCompany ? `
+    <label>${escapeHtml(labels.companyName)}
+      <input type="text" id="${formId}-company-name" value="${escapeHtml(state.companyName || '')}" />
+    </label>
+    <label>${escapeHtml(labels.companyRegNo)}
+      <input type="text" id="${formId}-company-reg-no" value="${escapeHtml(state.companyPpkNumber || '')}" />
+    </label>` : '';
+
+  return `<div class="assistance-form" id="${formId}">
+    <h4>${escapeHtml(labels.title)}</h4>
+    <div class="assistance-prefilled">
+      <p><strong>${escapeHtml(labels.state)}:</strong> ${escapeHtml(state.stateName || '')}</p>
+      <p><strong>${escapeHtml(labels.customerName)}:</strong> ${escapeHtml(customerName || '')}</p>
+      <p><strong>${escapeHtml(labels.category)}:</strong> ${escapeHtml(isCompany ? labels.company : labels.individual)}</p>
+      <p><strong>${escapeHtml(labels.phone)}:</strong> ${escapeHtml(state.mobile || '')}</p>
+      <p><strong>${escapeHtml(labels.email)}:</strong> ${escapeHtml(email || '')}</p>
+      <p><strong>${escapeHtml(labels.enquiryTitle)}:</strong> ${escapeHtml(state.faqEnquiryTitle || '')}</p>
+    </div>
+    <label>${escapeHtml(labels.enquiryDescription)}
+      <textarea id="${formId}-description" rows="3"></textarea>
+    </label>
+    <label>${escapeHtml(labels.idNumber)}
+      <input type="text" id="${formId}-id-number" />
+    </label>
+    ${companyFieldsHtml}
+    <label>${escapeHtml(labels.attachment)}
+      <input type="file" id="${formId}-attachment" />
+    </label>
+    <button type="button" class="assistance-submit-btn" onclick="submitAssistanceForm('${formId}')">${escapeHtml(labels.submit)}</button>
+  </div>`;
+}
+
+async function uploadAssistanceAttachment(file) {
+  const form = new FormData();
+  form.append('session_id', state.sessionId);
+  form.append('document_type_code', 'ASSISTANCE_ATTACHMENT');
+  form.append('file_field', 'file');
+  form.append('file', file, file.name || 'attachment.bin');
+  form.append('upload_source', 'user_upload');
+  const response = await apiRequest('/documents/upload', { method: 'POST', body: form });
+  return extractData(response);
+}
+
+async function submitAssistanceForm(formId) {
+  const isCompany = state.faqApplicantCategory === 'company';
+  const descriptionEl = document.getElementById(`${formId}-description`);
+  const idNumberEl = document.getElementById(`${formId}-id-number`);
+  const companyNameEl = document.getElementById(`${formId}-company-name`);
+  const companyRegNoEl = document.getElementById(`${formId}-company-reg-no`);
+  const attachmentEl = document.getElementById(`${formId}-attachment`);
+
+  const description = String(descriptionEl?.value || '').trim();
+  const idNumber = String(idNumberEl?.value || '').trim();
+  const companyName = String(companyNameEl?.value || '').trim();
+  const companyRegNo = String(companyRegNoEl?.value || '').trim();
+
+  if (!description || !idNumber || (isCompany && (!companyName || !companyRegNo))) {
+    await showApiError({ message: state.en ? 'Please complete all required fields.' : 'Sila lengkapkan semua medan yang diperlukan.' });
+    return;
+  }
+
+  const formEl = document.getElementById(formId);
+  const submitBtn = formEl ? formEl.querySelector('.assistance-submit-btn') : null;
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    let attachmentDocumentId = null;
+    const file = attachmentEl && attachmentEl.files ? attachmentEl.files[0] : null;
+    if (file) {
+      const uploaded = await uploadAssistanceAttachment(file);
+      attachmentDocumentId = uploaded?.document?.id || uploaded?.id || null;
+    }
+
+    const customerName = state.name;
+    const email = state.email;
+
+    await apiRequest('/assistance/submit', {
+      method: 'POST',
+      body: {
+        session_id: state.sessionId,
+        state: state.stateName,
+        customer_name: customerName,
+        applicant_category: isCompany ? 'company' : 'individual',
+        phone: state.mobile,
+        email,
+        enquiry_title: state.faqEnquiryTitle,
+        enquiry_description: description,
+        id_number: idNumber,
+        company_name: isCompany ? companyName : null,
+        company_registration_no: isCompany ? companyRegNo : null,
+        attachment_document_id: attachmentDocumentId,
+      },
+    });
+
+    const message = state.en
+      ? 'Thank you. Our team will contact you via email within 2 working days.'
+      : 'Terima kasih. Pasukan kami akan menghubungi anda melalui e-mel dalam tempoh 2 hari bekerja.';
+    endFaqConversation(message);
+  } catch (error) {
+    await showApiError(error, state.en ? 'Unable to submit the assistance request.' : 'Tidak dapat menghantar permintaan bantuan.');
+    if (submitBtn) submitBtn.disabled = false;
+  }
 }
 
 function buildStatePayload(text) {
@@ -2075,9 +2429,7 @@ async function handleStep(text) {
       state.languageCode = payload.language;
       state.step = 'ask_service';
       await showTyping(450);
-      await addMsg(state.en ? 'Thank you! My name is <strong>Bena</strong> and I am here to help you today.' : 'Terima kasih! Nama saya <strong>Bena</strong> dan saya di sini untuk membantu anda hari ini.');
-      await showTyping(450);
-      await addMsg(state.en ? 'What do you need help with today?' : 'Apakah bantuan yang anda perlukan hari ini?');
+      await addMsg(state.en ? 'Hi, I\'m <strong>Bena</strong>. How can I assist you today?' : 'Hai, saya <strong>Bena</strong>. Bagaimana saya boleh membantu anda hari ini?');
       setQR(getServiceQuickReplies());
       setInput(true);
       await refreshSession();
@@ -2094,8 +2446,20 @@ async function handleStep(text) {
   if (state.step === 'ask_service') {
     const payload = buildServicePayload(text);
     if (!payload) {
+      if (isRenewalFaqQuery(text)) {
+        try {
+          await routeRenewalQueryToFaq(text);
+          return;
+        } catch (error) {
+          await showApiError(error, 'Unable to open FAQ search.');
+          await addMsg(state.en ? 'Please choose a service above or try a different keyword.' : 'Sila pilih perkhidmatan di atas atau cuba kata kunci lain.');
+          setQR(getServiceQuickReplies());
+          setInput(true);
+          return;
+        }
+      }
       await showApiError({ message: 'Invalid service selected.', errors: { service: 'Please choose a supported service.' } }, 'Invalid service selected.');
-      await addMsg(state.en ? 'What do you need help with today?' : 'Apakah bantuan yang anda perlukan hari ini?');
+      await addMsg(state.en ? 'Hi, I\'m <strong>Bena</strong>. How can I assist you today?' : 'Hai, saya <strong>Bena</strong>. Bagaimana saya boleh membantu anda hari ini?');
       setQR(getServiceQuickReplies());
       setInput(true);
       return;
@@ -2111,7 +2475,7 @@ async function handleStep(text) {
         state.faqTopics = Array.isArray(topicsData.topics) ? topicsData.topics : [];
         state.step = 'ask_faq_topic';
         await showTyping(450);
-        await addMsg(state.en ? 'Please choose an FAQ topic:' : 'Sila pilih topik Soalan Lazim:');
+        await addMsg(state.en ? 'Please choose an FAQ topic, or type a keyword to search directly:' : 'Sila pilih topik Soalan Lazim, atau taip kata kunci untuk mencari terus:');
         setQR(faqTopicOptions());
         setInput(true);
         await refreshSession();
@@ -2121,6 +2485,10 @@ async function handleStep(text) {
       if (payload.service_type === 'company') {
         state.step = 'ask_company_ppk';
         await showTyping(450);
+        await addMsg(state.en
+          ? 'To proceed with your <strong>Company Email ID Cancellation</strong> request, please provide the following:<div class="info-box">1. PPK / SSM number<br>2. Company name<br>3. Company email address<br>4. Company contact number<br>5. Company state<br>6. Director full name<br>7. Director IC number<br>8. Reason for cancellation<br>9. Director IC front and back<br>10. SSM / PPK certificate</div>'
+          : 'Untuk meneruskan permohonan <strong>Pembatalan Email ID Syarikat</strong> anda, sila sediakan maklumat berikut:<div class="info-box">1. Nombor PPK / SSM<br>2. Nama syarikat<br>3. Alamat emel syarikat<br>4. Nombor telefon syarikat<br>5. Negeri syarikat<br>6. Nama penuh pengarah<br>7. Nombor IC pengarah<br>8. Sebab pembatalan<br>9. IC pengarah bahagian depan dan belakang<br>10. Sijil SSM / PPK</div>');
+        await showTyping(350);
         await addMsg(state.en
           ? 'Please provide your <strong>PPK / SSM number</strong> to begin the company cancellation request.'
           : 'Sila berikan <strong>nombor PPK / SSM</strong> anda untuk memulakan permohonan pembatalan syarikat.');
@@ -2140,7 +2508,7 @@ async function handleStep(text) {
       return;
     } catch (error) {
       await showApiError(error, 'Unable to save service selection.');
-      await addMsg(state.en ? 'What do you need help with today?' : 'Apakah bantuan yang anda perlukan hari ini?');
+      await addMsg(state.en ? 'Hi, I\'m <strong>Bena</strong>. How can I assist you today?' : 'Hai, saya <strong>Bena</strong>. Bagaimana saya boleh membantu anda hari ini?');
       setQR(getServiceQuickReplies());
       setInput(true);
       return;
@@ -2152,19 +2520,38 @@ async function handleStep(text) {
     if (text.trim() === backMenuLabel) {
       state.step = 'ask_service';
       await showTyping(350);
-      await addMsg(state.en ? 'What do you need help with today?' : 'Apakah bantuan yang anda perlukan hari ini?');
-      setQR([
-        state.en ? '1. Individual Email ID Cancellation' : '1. Pembatalan Email ID Individu',
-        state.en ? '2. Company Email ID Cancellation' : '2. Pembatalan Email ID Syarikat',
-        state.en ? '3. FAQ' : '3. Soalan Lazim',
-      ]);
+      await addMsg(state.en ? 'Hi, I\'m <strong>Bena</strong>. How can I assist you today?' : 'Hai, saya <strong>Bena</strong>. Bagaimana saya boleh membantu anda hari ini?');
+      setQR(getServiceQuickReplies());
       setInput(true);
       return;
     }
 
     const payload = buildFaqTopicPayload(text);
     if (!payload) {
-      await showApiError({ message: 'Invalid FAQ topic selected.', errors: { topic: 'Please choose a listed FAQ topic.' } }, 'Invalid FAQ topic selected.');
+      try {
+        const searchData = await searchFaqQuestions(text);
+        const questions = Array.isArray(searchData.questions) ? searchData.questions : [];
+        const suggestions = Array.isArray(searchData.suggestions) ? searchData.suggestions : [];
+        if (questions.length > 0) {
+          await showTyping(300);
+          await addMsg(faqSearchIntroMessage());
+          await addMsg(renderFaqQuestionList(questions));
+          setQR([state.en ? 'Back to menu' : 'Kembali ke menu']);
+          setInput(true);
+          return;
+        }
+        if (suggestions.length > 0) {
+          await showTyping(300);
+          await addMsg(state.en ? 'No exact match found. Did you mean one of these?' : 'Tiada padanan tepat dijumpai. Adakah anda maksudkan salah satu daripada ini?');
+          await addMsg(renderFaqQuestionList(suggestions));
+          setQR([state.en ? 'Back to menu' : 'Kembali ke menu']);
+          setInput(true);
+          return;
+        }
+      } catch (error) {
+        // fall through to the "no match" prompt below
+      }
+      await showApiError({ message: state.en ? 'No matching FAQ found. Try a different keyword or choose a topic below.' : 'Tiada Soalan Lazim sepadan dijumpai. Cuba kata kunci lain atau pilih topik di bawah.' }, 'Invalid FAQ topic selected.');
       await addMsg(state.en ? 'Please choose an FAQ topic:' : 'Sila pilih topik Soalan Lazim:');
       setQR(faqTopicOptions());
       setInput(true);
@@ -2176,12 +2563,14 @@ async function handleStep(text) {
       updateSessionStateFromSession(isPlainObject(data.session) ? data.session : data);
       state.faqTopicCode = payload.topic_code;
       state.faqSubtopics = Array.isArray(data.subtopics) ? data.subtopics : [];
-      state.step = 'ask_faq_subtopic';
+      state.faqSelectedTopic = payload.topic;
+      state.step = 'ask_faq_customer_name';
       await showTyping(400);
       await addMsg(state.en
-        ? `Here are the subtopics under <strong>${escapeHtml(faqTopicLabel(payload.topic))}</strong>:`
-        : `Berikut ialah subtopik di bawah <strong>${escapeHtml(faqTopicLabel(payload.topic))}</strong>:`);
-      setQR(faqSubtopicOptions());
+        ? 'To continue with your selected enquiry and help us assist you more accurately, please provide the following information:<div class="info-box">1. Full Name<br>2. Phone Number<br>3. State<br>4. Applicant Category (Individual / Company)<br>5. Personal Email<br>6. Company Email (required if Applicant Category = Company)</div>'
+        : 'Untuk meneruskan pertanyaan yang anda pilih dan membantu kami membantu anda dengan lebih tepat, sila berikan maklumat berikut:<div class="info-box">1. Nama Penuh<br>2. Nombor Telefon<br>3. Negeri<br>4. Kategori Pemohon (Individu / Syarikat)<br>5. Emel Peribadi<br>6. Emel Syarikat (diperlukan jika Kategori Pemohon = Syarikat)</div>');
+      await showTyping(450);
+      await addMsg(state.en ? 'May I have your <strong>full name</strong> please?' : 'Boleh saya dapatkan <strong>nama penuh</strong> anda?');
       setInput(true);
       await refreshSession();
       return;
@@ -2194,6 +2583,107 @@ async function handleStep(text) {
     }
   }
 
+  if (state.step === 'ask_faq_customer_name') {
+    const trimmedName = String(text || '').trim();
+    if (!trimmedName) {
+      await showApiError({ message: 'Full name is required.', errors: { full_name: 'Please enter your full name.' } }, 'Full name is required.');
+      await addMsg(state.en ? 'May I have your <strong>full name</strong> please?' : 'Boleh saya dapatkan <strong>nama penuh</strong> anda?');
+      setInput(true);
+      return;
+    }
+    state.name = trimmedName;
+    state.step = 'ask_faq_customer_phone';
+    await showTyping(400);
+    await addMsg(state.en ? `Thank you, <strong>${escapeHtml(trimmedName)}</strong>! May I have your <strong>phone number</strong>?` : `Terima kasih, <strong>${escapeHtml(trimmedName)}</strong>! Boleh saya dapatkan <strong>nombor telefon</strong> anda?`);
+    setInput(true);
+    return;
+  }
+
+  if (state.step === 'ask_faq_customer_phone') {
+    const payload = buildMobilePayload(text);
+    if (!payload) {
+      await showApiError({ message: 'Invalid phone number.', errors: { phone: 'Enter a valid phone number.' } }, 'Invalid phone number.');
+      await addMsg(state.en ? 'Please enter a valid <strong>phone number</strong>.' : 'Sila masukkan <strong>nombor telefon</strong> yang sah.');
+      setInput(true);
+      return;
+    }
+    state.mobile = payload.mobile;
+    state.step = 'ask_faq_customer_state';
+    await showTyping(400);
+    await addMsg(state.en ? 'Which <strong>state</strong> are you contacting us from?' : 'Dari <strong>negeri</strong> manakah anda menghubungi kami?');
+    setQR(MY_STATES);
+    setInput(true);
+    return;
+  }
+
+  if (state.step === 'ask_faq_customer_state') {
+    const payload = buildStatePayload(text);
+    if (!payload) {
+      await showApiError({ message: 'Invalid Malaysian state selected.', errors: { state: 'Please choose a valid Malaysian state.' } }, 'Invalid Malaysian state selected.');
+      await addMsg(state.en ? 'Which <strong>state</strong> are you contacting us from?' : 'Dari <strong>negeri</strong> manakah anda menghubungi kami?');
+      setQR(MY_STATES);
+      setInput(true);
+      return;
+    }
+    state.stateName = payload.state;
+    state.step = 'ask_faq_customer_category';
+    await showTyping(400);
+    await addMsg(state.en ? 'Are you enquiring as an <strong>Individual</strong> or a <strong>Company</strong>?' : 'Adakah anda membuat pertanyaan sebagai <strong>Individu</strong> atau <strong>Syarikat</strong>?');
+    setQR(faqApplicantCategoryOptions());
+    setInput(true);
+    return;
+  }
+
+  if (state.step === 'ask_faq_customer_category') {
+    const payload = buildFaqApplicantCategoryPayload(text);
+    if (!payload) {
+      await showApiError({ message: 'Invalid applicant category.', errors: { applicant_category: 'Please choose Individual or Company.' } }, 'Invalid applicant category.');
+      await addMsg(state.en ? 'Are you enquiring as an <strong>Individual</strong> or a <strong>Company</strong>?' : 'Adakah anda membuat pertanyaan sebagai <strong>Individu</strong> atau <strong>Syarikat</strong>?');
+      setQR(faqApplicantCategoryOptions());
+      setInput(true);
+      return;
+    }
+    state.faqApplicantCategory = payload.category;
+    state.step = 'ask_faq_customer_email';
+    await showTyping(400);
+    await addMsg(state.en ? 'Please provide your <strong>personal email address</strong>.' : 'Sila berikan <strong>alamat emel peribadi</strong> anda.');
+    setInput(true);
+    return;
+  }
+
+  if (state.step === 'ask_faq_customer_email') {
+    const payload = buildEmailPayload(text);
+    if (!payload) {
+      await showApiError({ message: 'Invalid email address.', errors: { email: 'Enter a valid email address.' } }, 'Invalid email address.');
+      await addMsg(state.en ? 'Please provide a valid <strong>personal email address</strong>.' : 'Sila berikan <strong>alamat emel peribadi</strong> yang sah.');
+      setInput(true);
+      return;
+    }
+    state.email = payload.email;
+    if (state.faqApplicantCategory === 'company') {
+      state.step = 'ask_faq_customer_company_email';
+      await showTyping(400);
+      await addMsg(state.en ? 'Please provide the <strong>company email address</strong>.' : 'Sila berikan <strong>alamat emel syarikat</strong>.');
+      setInput(true);
+      return;
+    }
+    await finishFaqCustomerInfoCollection();
+    return;
+  }
+
+  if (state.step === 'ask_faq_customer_company_email') {
+    const payload = buildEmailPayload(text);
+    if (!payload) {
+      await showApiError({ message: 'Invalid company email address.', errors: { company_email: 'Enter a valid email address.' } }, 'Invalid company email address.');
+      await addMsg(state.en ? 'Please provide a valid <strong>company email address</strong>.' : 'Sila berikan <strong>alamat emel syarikat</strong> yang sah.');
+      setInput(true);
+      return;
+    }
+    state.companyEmail = payload.email;
+    await finishFaqCustomerInfoCollection();
+    return;
+  }
+
   if (state.step === 'ask_faq_subtopic') {
     const backTopicsLabel = state.en ? 'Back to topics' : 'Kembali ke topik';
     const backMenuLabel = state.en ? 'Back to menu' : 'Kembali ke menu';
@@ -2203,12 +2693,8 @@ async function handleStep(text) {
     if (trimmed === backMenuLabel) {
       state.step = 'ask_service';
       await showTyping(350);
-      await addMsg(state.en ? 'What do you need help with today?' : 'Apakah bantuan yang anda perlukan hari ini?');
-      setQR([
-        state.en ? '1. Individual Email ID Cancellation' : '1. Pembatalan Email ID Individu',
-        state.en ? '2. Company Email ID Cancellation' : '2. Pembatalan Email ID Syarikat',
-        state.en ? '3. FAQ' : '3. Soalan Lazim',
-      ]);
+      await addMsg(state.en ? 'Hi, I\'m <strong>Bena</strong>. How can I assist you today?' : 'Hai, saya <strong>Bena</strong>. Bagaimana saya boleh membantu anda hari ini?');
+      setQR(getServiceQuickReplies());
       setInput(true);
       return;
     }
@@ -2244,7 +2730,30 @@ async function handleStep(text) {
 
     const payload = buildFaqSubtopicPayload(text);
     if (!payload) {
-      await showApiError({ message: 'Invalid FAQ subtopic selected.', errors: { subtopic: 'Please choose a listed FAQ subtopic.' } }, 'Invalid FAQ subtopic selected.');
+      try {
+        const searchData = await searchFaqQuestions(text);
+        const questions = Array.isArray(searchData.questions) ? searchData.questions : [];
+        const suggestions = Array.isArray(searchData.suggestions) ? searchData.suggestions : [];
+        if (questions.length > 0) {
+          await showTyping(300);
+          await addMsg(faqSearchIntroMessage());
+          await addMsg(renderFaqQuestionList(questions));
+          setQR([backTopicsLabel, backMenuLabel]);
+          setInput(true);
+          return;
+        }
+        if (suggestions.length > 0) {
+          await showTyping(300);
+          await addMsg(state.en ? 'No exact match found. Did you mean one of these?' : 'Tiada padanan tepat dijumpai. Adakah anda maksudkan salah satu daripada ini?');
+          await addMsg(renderFaqQuestionList(suggestions));
+          setQR([backTopicsLabel, backMenuLabel]);
+          setInput(true);
+          return;
+        }
+      } catch (error) {
+        // fall through to the "no match" prompt below
+      }
+      await showApiError({ message: state.en ? 'No matching FAQ found. Try a different keyword or choose a subtopic below.' : 'Tiada Soalan Lazim sepadan dijumpai. Cuba kata kunci lain atau pilih subtopik di bawah.' }, 'Invalid FAQ subtopic selected.');
       await addMsg(state.en ? 'Please choose a subtopic:' : 'Sila pilih subtopik:');
       setQR(faqSubtopicOptions());
       setInput(true);
@@ -2530,9 +3039,9 @@ async function handleStep(text) {
       state.companyReason = payload.value;
       state.step = 'ask_ic_copy';
       await showTyping(450);
-      await addMsg(buildUploadTipHtml(state.en
-        ? 'Thank you. Please upload the director <strong>IC front</strong>, <strong>IC back</strong>, and the <strong>SSM / PPK certificate</strong>.'
-        : 'Terima kasih. Sila muat naik <strong>IC depan</strong>, <strong>IC belakang</strong>, dan <strong>sijil SSM / PPK</strong> pengarah.'));
+await addMsg(buildUploadTipHtml(state.en
+  ? 'Thank you. Please upload your <strong>directors</strong>\' <strong>IC front</strong>, <strong>IC back</strong>, and the <strong>SSM / PPK certificate</strong>. Make sure the images are <strong>clear and fully visible</strong>.<div class="warn-box">Photo tips:<br>- Place the documents on a flat, well-lit surface<br>- Avoid blur, shadows, or cropping<br>- Both front and back copies are required<br>- Please upload your NRIC with the \'Kegunaan CIDB Only\'</div>'
+  : 'Terima kasih. Sila muat naik <strong>IC pengarah</strong> bahagian depan, <strong>IC belakang</strong>, dan <strong>sijil SSM / PPK</strong>. Pastikan imej <strong>jelas dan kelihatan sepenuhnya</strong>.<div class="warn-box">Petua foto:<br>- Letakkan dokumen di permukaan rata yang terang<br>- Elakkan kabur, bayang, atau pemotongan gambar<br>- Salinan depan dan belakang diperlukan<br>- Sila muat naik NRIC anda dengan \'Kegunaan CIDB Only\'</div>'));
       setUploadLabels(state.en);
       state.identityEditEnabled = false;
       state.sigDataUrl = null;
@@ -2675,9 +3184,9 @@ async function handleStep(text) {
           ? 'Thank you. Please upload a clear copy of your <strong>Passport Information Page</strong>.<div class="warn-box">Photo tips:<br>- Keep the full page visible<br>- Avoid blur, shadows, or cropping<br>- Make sure all details are readable</div>'
           : 'Terima kasih. Sila muat naik salinan <strong>Muka Surat Maklumat Pasport</strong> yang jelas.<div class="warn-box">Petua foto:<br>- Pastikan keseluruhan muka surat kelihatan<br>- Elakkan kabur, bayang, atau gambar terpotong<br>- Pastikan semua butiran boleh dibaca</div>'));
       } else {
-        await addMsg(buildUploadTipHtml(state.en
-          ? 'Thank you. Please upload your <strong>IC copy (front & back)</strong>. Make sure the image is <strong>clear and fully visible</strong>.<div class="warn-box">Photo tips:<br>- Place IC on a flat, well-lit surface<br>- Avoid blur, shadows, or cropping<br>- Both front and back copies are required</div>'
-          : 'Terima kasih. Sila muat naik <strong>salinan IC (depan & belakang)</strong>. Pastikan gambar <strong>jelas dan tidak terpotong</strong>.<div class="warn-box">Petua foto:<br>- Letak IC di permukaan rata yang terang<br>- Elakkan kabur, bayang, atau gambar terpotong<br>- Salinan depan dan belakang diperlukan</div>'));
+await addMsg(buildUploadTipHtml(state.en
+  ? 'Thank you. Please upload your <strong>directors</strong>\' <strong>IC front</strong>, <strong>IC back</strong>, and the <strong>SSM / PPK certificate</strong>. Make sure the images are <strong>clear and fully visible</strong>.<div class="warn-box">Photo tips:<br>- Place the documents on a flat, well-lit surface<br>- Avoid blur, shadows, or cropping<br>- Both front and back copies are required<br>- Please upload your NRIC with the \'Kegunaan CIDB Only\'</div>'
+  : 'Terima kasih. Sila muat naik <strong>IC pengarah</strong> bahagian depan, <strong>IC belakang</strong>, dan <strong>sijil SSM / PPK</strong>. Pastikan imej <strong>jelas dan kelihatan sepenuhnya</strong>.<div class="warn-box">Petua foto:<br>- Letakkan dokumen di permukaan rata yang terang<br>- Elakkan kabur, bayang, atau pemotongan gambar<br>- Salinan depan dan belakang diperlukan<br>- Sila muat naik NRIC anda dengan \'Kegunaan CIDB Only\'</div>'));
       }
       setUploadLabels(state.en);
       state.identityEditEnabled = false;
