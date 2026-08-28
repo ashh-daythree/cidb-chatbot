@@ -22,6 +22,7 @@ final class CimsVerificationResult extends AbstractModel
             'request_id',
             'attempt_no',
             'result_status',
+            'retry_available',
             'response_code',
             'response_message',
             'external_reference_no',

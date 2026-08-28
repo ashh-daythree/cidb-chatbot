@@ -123,9 +123,8 @@ final class SubmissionController extends AbstractController
     private function resolveRetryState(array $submission, ?array $verification): array
     {
         $requestStatus = (string) ($submission['status'] ?? '');
-        $latestStatus = (string) ($submission['latest_cims_status'] ?? '');
-        $attemptNo = (int) ($verification['attempt_no'] ?? 0);
-        $retryable = in_array($latestStatus, ['norecord', 'error', 'failed'], true);
+        $hasDisplayMessage = is_array($verification) && trim((string) ($verification['display_message'] ?? '')) !== '';
+        $retryAvailable = is_array($verification) && $hasDisplayMessage && (bool) ($verification['retry_available'] ?? false);
         $hasFinalState = in_array($requestStatus, ['failed', 'approved', 'manual_review', 'rejected', 'completed'], true);
 
         if ($requestStatus === 'under_review') {
@@ -136,7 +135,7 @@ final class SubmissionController extends AbstractController
             ];
         }
 
-        if ($requestStatus === 'submitted' && $retryable && $attemptNo <= 1) {
+        if ($retryAvailable) {
             return [
                 'retry_available' => true,
                 'retry_in_progress' => false,

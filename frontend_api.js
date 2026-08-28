@@ -166,6 +166,28 @@ function getCertificateDocumentLabel(en = state.en) {
   return en ? 'SSM / PPK Certificate' : 'Sijil SSM / PPK';
 }
 
+function buildUploadExampleSectionHtml() {
+  return (
+    '<div class="upload-example-section">'
+    + '<div class="upload-example-title">Example</div>'
+    + '<div class="upload-example-grid">'
+    + '<figure class="upload-example-card">'
+    + '<img src="assets/images/ic-front-example.png" alt="IC Front Example" class="upload-example-img" loading="lazy">'
+    + '<figcaption>IC Front Example</figcaption>'
+    + '</figure>'
+    + '<figure class="upload-example-card">'
+    + '<img src="assets/images/ic-back-example.png" alt="IC Back Example" class="upload-example-img" loading="lazy">'
+    + '<figcaption>IC Back Example</figcaption>'
+    + '</figure>'
+    + '</div>'
+    + '</div>'
+  );
+}
+
+function buildUploadTipHtml(messageHtml) {
+  return `${messageHtml}${buildUploadExampleSectionHtml()}`;
+}
+
 function getIdentityEditUi(en = state.en) {
   if (isCompanyService()) {
     return en ? {
@@ -1333,12 +1355,8 @@ async function renderCancellationSubmissionState(data, { fromRetry = false, allo
   );
   const nextAction = firstNonEmpty(data?.next_action, data?.nextAction, 'done').toLowerCase();
   const finalFailureType = firstNonEmpty(data?.final_failure_type, data?.finalFailureType, null);
-  const message = firstNonEmpty(
-    data?.message,
-    verification?.display_message,
-    verification?.response_message,
-    ''
-  );
+  const message = resolveCancellationCustomerMessage(data, verification);
+  const hasDisplayMessage = hasFinalVerificationDisplayMessage(verification);
 
   if (requestNumber) {
     state.requestNumber = requestNumber;
@@ -1356,7 +1374,7 @@ async function renderCancellationSubmissionState(data, { fromRetry = false, allo
     state.submission = request;
   }
 
-  if (data?.retry_available === true || nextAction === 'retry_available') {
+  if (hasDisplayMessage && data?.retry_available === true) {
     state.retryRequestIdentifier = requestNumber || state.requestNumber;
     state.step = 'awaiting_retry';
     uploadArea.style.display = 'none';
@@ -1367,7 +1385,7 @@ async function renderCancellationSubmissionState(data, { fromRetry = false, allo
 
     await addMsg(renderBotRichMessage(message || (en
       ? 'Cancellation attempt 1 was unsuccessful. Click Retry to try again.'
-      : 'Percubaan pertama pembatalan tidak berjaya. Klik Retry untuk mencuba semula.')), 'error');
+      : 'Percubaan pertama pembatalan tidak berjaya. Klik Retry untuk mencuba semula.')), 'bot');
     setQuickReplyActions([
       {
         label: en ? 'Retry' : 'Retry',
@@ -2155,6 +2173,32 @@ function extractVerificationCustomerMessage(verification) {
   }
 
   return message;
+}
+
+function resolveCancellationCustomerMessage(data, verification) {
+  const candidates = [
+    extractVerificationCustomerMessage(verification),
+    stripWrappingQuotes(firstNonEmpty(data?.message, '')),
+    stripWrappingQuotes(firstNonEmpty(isPlainObject(verification) ? verification.response_message : '', '')),
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+
+    if (looksLikeBotAcknowledgementText(candidate)) {
+      continue;
+    }
+
+    return candidate;
+  }
+
+  return '';
+}
+
+function hasFinalVerificationDisplayMessage(verification) {
+  return extractVerificationCustomerMessage(verification) !== '';
 }
 
 function delay(ms) {
@@ -2995,9 +3039,9 @@ async function handleStep(text) {
       state.companyReason = payload.value;
       state.step = 'ask_ic_copy';
       await showTyping(450);
-      await addMsg(state.en
-        ? 'Thank you. Please upload your <strong>directors</strong>\' <strong>IC front</strong>, <strong>IC back</strong>, and the <strong>SSM / PPK certificate</strong>. Make sure the images are <strong>clear and fully visible</strong>.<div class="warn-box">Photo tips:<br>- Place the documents on a flat, well-lit surface<br>- Avoid blur, shadows, or cropping<br>- Both front and back copies are required<br>- Please upload your NRIC with the \'Kegunaan CIDB Only\'</div>'
-        : 'Terima kasih. Sila muat naik <strong>IC pengarah</strong> bahagian depan, <strong>IC belakang</strong>, dan <strong>sijil SSM / PPK</strong>. Pastikan imej <strong>jelas dan kelihatan sepenuhnya</strong>.<div class="warn-box">Petua foto:<br>- Letakkan dokumen di permukaan rata yang terang<br>- Elakkan kabur, bayang, atau pemotongan gambar<br>- Salinan depan dan belakang diperlukan<br>- Sila muat naik NRIC anda dengan \'Kegunaan CIDB Only\'</div>');
+await addMsg(buildUploadTipHtml(state.en
+  ? 'Thank you. Please upload your <strong>directors</strong>\' <strong>IC front</strong>, <strong>IC back</strong>, and the <strong>SSM / PPK certificate</strong>. Make sure the images are <strong>clear and fully visible</strong>.<div class="warn-box">Photo tips:<br>- Place the documents on a flat, well-lit surface<br>- Avoid blur, shadows, or cropping<br>- Both front and back copies are required<br>- Please upload your NRIC with the \'Kegunaan CIDB Only\'</div>'
+  : 'Terima kasih. Sila muat naik <strong>IC pengarah</strong> bahagian depan, <strong>IC belakang</strong>, dan <strong>sijil SSM / PPK</strong>. Pastikan imej <strong>jelas dan kelihatan sepenuhnya</strong>.<div class="warn-box">Petua foto:<br>- Letakkan dokumen di permukaan rata yang terang<br>- Elakkan kabur, bayang, atau pemotongan gambar<br>- Salinan depan dan belakang diperlukan<br>- Sila muat naik NRIC anda dengan \'Kegunaan CIDB Only\'</div>'));
       setUploadLabels(state.en);
       state.identityEditEnabled = false;
       state.sigDataUrl = null;
@@ -3136,13 +3180,13 @@ async function handleStep(text) {
       state.step = 'ask_ic_copy';
       await showTyping(500);
       if (isPassportIdentityType()) {
-        await addMsg(state.en
+        await addMsg(buildUploadTipHtml(state.en
           ? 'Thank you. Please upload a clear copy of your <strong>Passport Information Page</strong>.<div class="warn-box">Photo tips:<br>- Keep the full page visible<br>- Avoid blur, shadows, or cropping<br>- Make sure all details are readable</div>'
-          : 'Terima kasih. Sila muat naik salinan <strong>Muka Surat Maklumat Pasport</strong> yang jelas.<div class="warn-box">Petua foto:<br>- Pastikan keseluruhan muka surat kelihatan<br>- Elakkan kabur, bayang, atau gambar terpotong<br>- Pastikan semua butiran boleh dibaca</div>');
+          : 'Terima kasih. Sila muat naik salinan <strong>Muka Surat Maklumat Pasport</strong> yang jelas.<div class="warn-box">Petua foto:<br>- Pastikan keseluruhan muka surat kelihatan<br>- Elakkan kabur, bayang, atau gambar terpotong<br>- Pastikan semua butiran boleh dibaca</div>'));
       } else {
-        await addMsg(state.en
-          ? 'Thank you. Please upload your <strong>IC copy (front & back)</strong>. Make sure the image is <strong>clear and fully visible</strong>.<div class="warn-box">Photo tips:<br>- Place IC on a flat, well-lit surface<br>- Avoid blur, shadows, or cropping<br>- Both front and back copies are required<br>- Please upload your NRIC with the \'Kegunaan CIDB Only\'</div>'
-          : 'Terima kasih. Sila muat naik <strong>salinan IC (depan & belakang)</strong>. Pastikan gambar <strong>jelas dan tidak terpotong</strong>.<div class="warn-box">Petua foto:<br>- Letak IC di permukaan rata yang terang<br>- Elakkan kabur, bayang, atau gambar terpotong<br>- Salinan depan dan belakang diperlukan<br>- Sila muat naik NRIC anda dengan \'Kegunaan CIDB Only\'</div>');
+await addMsg(buildUploadTipHtml(state.en
+  ? 'Thank you. Please upload your <strong>directors</strong>\' <strong>IC front</strong>, <strong>IC back</strong>, and the <strong>SSM / PPK certificate</strong>. Make sure the images are <strong>clear and fully visible</strong>.<div class="warn-box">Photo tips:<br>- Place the documents on a flat, well-lit surface<br>- Avoid blur, shadows, or cropping<br>- Both front and back copies are required<br>- Please upload your NRIC with the \'Kegunaan CIDB Only\'</div>'
+  : 'Terima kasih. Sila muat naik <strong>IC pengarah</strong> bahagian depan, <strong>IC belakang</strong>, dan <strong>sijil SSM / PPK</strong>. Pastikan imej <strong>jelas dan kelihatan sepenuhnya</strong>.<div class="warn-box">Petua foto:<br>- Letakkan dokumen di permukaan rata yang terang<br>- Elakkan kabur, bayang, atau pemotongan gambar<br>- Salinan depan dan belakang diperlukan<br>- Sila muat naik NRIC anda dengan \'Kegunaan CIDB Only\'</div>'));
       }
       setUploadLabels(state.en);
       state.identityEditEnabled = false;
@@ -3598,10 +3642,28 @@ async function submitIC() {
       resolvedDisplayMessageIsEmpty: !String(resolvedVerification?.display_message ?? '').trim(),
     });
 
+    if (botMessage && hasFinalVerificationDisplayMessage(resolvedVerification) && resolvedVerification?.retry_available === true) {
+      const retryReadyState = {
+        ...data,
+        verification: resolvedVerification,
+        retry_available: true,
+        next_action: 'retry_available',
+      };
+      const cancellationState = await renderCancellationSubmissionState(retryReadyState, { fromRetry: false });
+      if (cancellationState.handled) {
+        displayWaitSequence?.stop?.();
+        return;
+      }
+    }
+
     if (botMessage) {
       const refreshed = await refreshSubmission(identifier);
       if (isPlainObject(refreshed?.submission)) {
         state.submission = refreshed.submission;
+      }
+      if (refreshed && await renderCancellationSubmissionState(refreshed, { fromRetry: false })) {
+        displayWaitSequence?.stop?.();
+        return;
       }
     }
 
