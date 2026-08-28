@@ -633,6 +633,24 @@ final class SubmissionService extends AbstractService
             'attempt_no' => $attemptNo,
         ]);
 
+        $retryAvailable = (bool) ($verification['retry_available'] ?? false);
+
+        if ($outcome === 'deleted' && $allowRetryOnFailure && $retryAvailable) {
+            $retryMessage = $this->buildCancellationRetryAvailableMessage('individual', (string) ($snapshot['session']['language_code'] ?? 'en'));
+            $this->updateVerificationDisplayMessage((string) ($verification['id'] ?? ''), $retryMessage, true);
+
+            return [
+                'mode' => 'retry_available',
+                'verification' => array_merge(is_array($verification) ? $verification : [], [
+                    'display_message' => $retryMessage,
+                    'response_message' => $retryMessage,
+                ]),
+                'retry_available' => true,
+                'final_failure_type' => 'cancellation',
+                'final_message' => $retryMessage,
+            ];
+        }
+
         if ($outcome === 'deleted') {
             $this->requestService->markFinalOutcome($requestId, 'approved', 'deleted');
             $this->sessionService->markCompleted($sessionId);
@@ -663,8 +681,9 @@ final class SubmissionService extends AbstractService
             ];
         }
 
-        if (in_array($outcome, ['norecord', 'error'], true) && $allowRetryOnFailure) {
+        if ($outcome === 'error' && $allowRetryOnFailure && $retryAvailable) {
             $retryMessage = $this->buildCancellationRetryAvailableMessage('individual', (string) ($snapshot['session']['language_code'] ?? 'en'));
+            $this->updateVerificationDisplayMessage((string) ($verification['id'] ?? ''), $retryMessage, true);
 
             return [
                 'mode' => 'retry_available',
@@ -820,8 +839,11 @@ final class SubmissionService extends AbstractService
             ];
         }
 
-        if ($outcome === 'failed' && $allowRetryOnFailure) {
+        $retryAvailable = (bool) ($verification['retry_available'] ?? false);
+
+        if ($outcome === 'failed' && $allowRetryOnFailure && $retryAvailable) {
             $retryMessage = $this->buildCancellationRetryAvailableMessage('company', (string) ($snapshot['session']['language_code'] ?? 'en'));
+            $this->updateVerificationDisplayMessage((string) ($verification['id'] ?? ''), $retryMessage, true);
 
             return [
                 'mode' => 'retry_available',
@@ -909,42 +931,45 @@ final class SubmissionService extends AbstractService
             throw new AppException('Session not found.', 404, 'SESSION_NOT_FOUND');
         }
 
-        $claimedRequest = $this->requestService->claimCancellationRetry((string) ($request['id'] ?? ''));
-        if ($claimedRequest === null) {
-            $currentRequest = $this->requestService->findBySessionId($sessionId) ?? $request;
-            $verification = null;
-            if (!empty($currentRequest['id'])) {
-                $verification = $this->verificationService->latestByRequestId((string) $currentRequest['id']);
-            }
+        $verification = null;
+        if (!empty($request['id'])) {
+            $verification = $this->verificationService->latestByRequestId((string) $request['id']);
+        }
 
-            $status = (string) ($currentRequest['status'] ?? '');
-            if ($status === 'under_review') {
-                return [
-                    'message' => 'Cancellation retry is already running.',
-                    'next_action' => 'poll',
-                    'retry_in_progress' => true,
-                    'retry_available' => false,
-                    'session' => $session,
-                    'request_number' => $currentRequest['request_number'] ?? null,
-                    'request' => $currentRequest,
-                    'verification' => $verification,
-                    'final_failure_type' => null,
-                ];
-            }
+        $hasRetryableVerification = is_array($verification)
+            && trim((string) ($verification['display_message'] ?? '')) !== ''
+            && (bool) ($verification['retry_available'] ?? false);
 
+        if (!$hasRetryableVerification) {
             return [
                 'message' => 'Cancellation retry is no longer available.',
                 'next_action' => 'done',
                 'retry_available' => false,
                 'session' => $session,
-                'request_number' => $currentRequest['request_number'] ?? null,
-                'request' => $currentRequest,
+                'request_number' => $request['request_number'] ?? null,
+                'request' => $request,
                 'verification' => $verification,
                 'final_failure_type' => null,
             ];
         }
 
-        $request = $claimedRequest;
+        $currentStatus = (string) ($request['status'] ?? '');
+        if ($currentStatus === 'under_review') {
+            return [
+                'message' => 'Cancellation retry is already running.',
+                'next_action' => 'poll',
+                'retry_in_progress' => true,
+                'retry_available' => false,
+                'session' => $session,
+                'request_number' => $request['request_number'] ?? null,
+                'request' => $request,
+                'verification' => $verification,
+                'final_failure_type' => null,
+            ];
+        }
+
+        $this->requestService->markUnderReview((string) ($request['id'] ?? ''));
+        $request = $this->requestService->findByRequestNumber($identifier) ?? $this->requestService->findBySessionId($sessionId) ?? $request;
         $snapshot = $this->buildSubmissionSnapshot($sessionId);
         $serviceType = $this->resolveServiceType($snapshot);
         $applicant = null;
@@ -1129,15 +1154,21 @@ final class SubmissionService extends AbstractService
             : 'We are unable to complete your Email ID cancellation after the final attempt. Your request has been forwarded to the Email Team. Please wait for an email from the Email Team.';
     }
 
-    private function updateVerificationDisplayMessage(string $verificationId, string $message): void
+    private function updateVerificationDisplayMessage(string $verificationId, string $message, ?bool $retryAvailable = null): void
     {
         if ($verificationId === '') {
             return;
         }
 
-        $this->cimsResultRepository->update($verificationId, [
+        $payload = [
             'display_message' => $message,
-        ]);
+        ];
+
+        if ($retryAvailable !== null) {
+            $payload['retry_available'] = $retryAvailable;
+        }
+
+        $this->cimsResultRepository->update($verificationId, $payload);
     }
 
     private function countOcrAttempts(string $sessionId): int

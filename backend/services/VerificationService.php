@@ -61,6 +61,7 @@ final class VerificationService extends AbstractService
                 'request_id' => $requestId,
                 'attempt_no' => $this->nextAttemptNumber($requestId),
                 'result_status' => $normalized['result_status'],
+                'retry_available' => (bool) ($normalized['retry_available'] ?? false),
                 'response_code' => $normalized['response_code'],
                 'response_message' => $normalized['response_message'],
                 'external_reference_no' => $normalized['external_reference_no'],
@@ -139,6 +140,21 @@ final class VerificationService extends AbstractService
         return $verification;
     }
 
+    public function isUnclearDocumentRetryEligible(array $verification, string $serviceType): bool
+    {
+        $serviceType = mb_strtolower(trim($serviceType));
+        if (!in_array($serviceType, ['individual', 'company'], true)) {
+            return false;
+        }
+
+        $text = $this->verificationText($verification);
+        if ($text === '') {
+            return false;
+        }
+
+        return $this->matchesUnclearDocumentText($text, $serviceType);
+    }
+
     /**
      * @param array<string, mixed> $context
      * @return array<string, mixed>
@@ -169,6 +185,7 @@ final class VerificationService extends AbstractService
                 'request_id' => $requestId,
                 'attempt_no' => $this->nextAttemptNumber($requestId),
                 'result_status' => $normalized['result_status'],
+                'retry_available' => (bool) ($normalized['retry_available'] ?? false),
                 'response_code' => $normalized['response_code'],
                 'response_message' => $normalized['response_message'],
                 'external_reference_no' => $normalized['external_reference_no'],
@@ -497,6 +514,12 @@ final class VerificationService extends AbstractService
     {
         $rawText = trim((string) ($botResult['raw_response_text'] ?? ''));
         $parsed = is_array($botResult['parsed_response'] ?? null) ? $botResult['parsed_response'] : null;
+        if ($parsed === null && $rawText !== '') {
+            $decodedRawText = json_decode($rawText, true);
+            if (is_array($decodedRawText)) {
+                $parsed = $decodedRawText;
+            }
+        }
         $isAcknowledgement = $this->isAcknowledgementResponse($parsed);
 
         $responseMessage = $this->extractResponseMessage($parsed, $rawText, (string) ($botResult['error_message'] ?? ''));
@@ -512,6 +535,7 @@ final class VerificationService extends AbstractService
 
         return [
             'result_status' => $resultStatus,
+            'retry_available' => $isAcknowledgement ? false : $this->extractRetryAvailable($parsed),
             'response_code' => $this->extractResponseCode($parsed, (int) ($botResult['status_code'] ?? 0), $resultStatus),
             'response_message' => $responseMessage,
             'external_reference_no' => $this->extractExternalReference($parsed),
@@ -529,6 +553,12 @@ final class VerificationService extends AbstractService
     {
         $rawText = trim((string) ($botResult['raw_response_text'] ?? ''));
         $parsed = is_array($botResult['parsed_response'] ?? null) ? $botResult['parsed_response'] : null;
+        if ($parsed === null && $rawText !== '') {
+            $decodedRawText = json_decode($rawText, true);
+            if (is_array($decodedRawText)) {
+                $parsed = $decodedRawText;
+            }
+        }
         $isAcknowledgement = $this->isAcknowledgementResponse($parsed);
         $responseMessage = $this->extractCompanyResponseMessage($parsed, $rawText, (string) ($botResult['error_message'] ?? ''));
         $resultStatus = $this->extractCompanyResultStatus($parsed, $responseMessage, (int) ($botResult['status_code'] ?? 0), (bool) ($botResult['success'] ?? false));
@@ -540,6 +570,7 @@ final class VerificationService extends AbstractService
 
         return [
             'result_status' => $resultStatus,
+            'retry_available' => $isAcknowledgement ? false : $this->extractRetryAvailable($parsed),
             'response_message' => $responseMessage,
             'display_message' => $displayMessage,
             'response_code' => $this->extractResponseCode($parsed, (int) ($botResult['status_code'] ?? 0), $resultStatus),
@@ -615,8 +646,20 @@ final class VerificationService extends AbstractService
             return false;
         }
 
-        $status = strtolower(trim((string) ($parsed['status'] ?? '')));
-        $scheduleId = trim((string) ($parsed['schedule_id'] ?? ''));
+        $status = strtolower(trim((string) ($parsed['status'] ?? ($parsed['data']['status'] ?? ''))));
+        $scheduleIdCandidates = [
+            $parsed['schedule_id'] ?? null,
+            $parsed['data']['schedule_id'] ?? null,
+            $parsed['inserts'][0]['schedule_id'] ?? null,
+            $parsed['data']['inserts'][0]['schedule_id'] ?? null,
+        ];
+        $scheduleId = '';
+        foreach ($scheduleIdCandidates as $candidate) {
+            if (is_string($candidate) && trim($candidate) !== '') {
+                $scheduleId = trim($candidate);
+                break;
+            }
+        }
 
         return $status === 'inserted' && $scheduleId !== '';
     }
@@ -658,6 +701,10 @@ final class VerificationService extends AbstractService
                 return 'error';
             }
 
+            if ($this->matchesUnclearDocumentText($normalizedMessage, 'individual')) {
+                return 'error';
+            }
+
             return 'deleted';
         }
 
@@ -667,6 +714,10 @@ final class VerificationService extends AbstractService
 
         if (str_contains($normalizedMessage, 'unable to locate') || str_contains($normalizedMessage, 'no record') || str_contains($normalizedMessage, 'not found')) {
             return 'norecord';
+        }
+
+        if ($this->matchesUnclearDocumentText($normalizedMessage, 'individual')) {
+            return 'error';
         }
 
         return 'error';
@@ -705,6 +756,10 @@ final class VerificationService extends AbstractService
                 return 'rejected';
             }
 
+            if ($this->matchesUnclearDocumentText($normalizedMessage, 'company')) {
+                return 'failed';
+            }
+
             if (str_contains($normalizedMessage, 'pending') || str_contains($normalizedMessage, 'processing')) {
                 return 'pending';
             }
@@ -720,11 +775,232 @@ final class VerificationService extends AbstractService
             return 'rejected';
         }
 
+        if ($this->matchesUnclearDocumentText($normalizedMessage, 'company')) {
+            return 'failed';
+        }
+
         if (str_contains($normalizedMessage, 'pending') || str_contains($normalizedMessage, 'processing')) {
             return 'pending';
         }
 
         return 'failed';
+    }
+
+    /**
+     * @param array<string, mixed>|null $parsed
+     */
+    private function extractRetryAvailable(?array $parsed): bool
+    {
+        $candidates = [];
+
+        if ($parsed !== null) {
+            $candidates[] = $parsed['retry_available'] ?? null;
+            $candidates[] = $parsed['data']['retry_available'] ?? null;
+        }
+
+        foreach ($candidates as $candidate) {
+            if (is_bool($candidate)) {
+                if ($candidate === true) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (is_int($candidate)) {
+                if ($candidate === 1) {
+                    return true;
+                }
+
+                if ($candidate === 0) {
+                    continue;
+                }
+            }
+
+            if (is_string($candidate)) {
+                $normalized = strtolower(trim($candidate));
+                if (in_array($normalized, ['true', '1', 'yes', 'y'], true)) {
+                    return true;
+                }
+
+                if (in_array($normalized, ['false', '0', 'no', 'n'], true)) {
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function verificationText(array $verification): string
+    {
+        $pieces = [];
+        $this->collectVerificationText($verification['response_message'] ?? null, $pieces);
+        $this->collectVerificationText($verification['display_message'] ?? null, $pieces);
+        $this->collectVerificationText($verification['rpa_response_text'] ?? null, $pieces);
+        $this->collectVerificationText($verification['bot_response_text'] ?? null, $pieces);
+        $this->collectVerificationText($verification['message'] ?? null, $pieces);
+        $this->collectVerificationText($verification['response_payload'] ?? null, $pieces);
+        $this->collectVerificationText($verification['bot_response_body'] ?? null, $pieces);
+
+        $pieces = array_values(array_filter(array_map(
+            static fn (string $piece): string => trim(preg_replace('/\s+/', ' ', $piece) ?? ''),
+            $pieces
+        )));
+
+        return trim(implode(' ', array_values(array_unique($pieces))));
+    }
+
+    /**
+     * @param array<int, string> $pieces
+     */
+    private function collectVerificationText(mixed $value, array &$pieces): void
+    {
+        if (is_string($value)) {
+            $trimmed = trim($value);
+            if ($trimmed === '') {
+                return;
+            }
+
+            $pieces[] = $trimmed;
+
+            $decoded = json_decode($trimmed, true);
+            if (is_array($decoded)) {
+                $this->collectVerificationText($decoded, $pieces);
+            }
+
+            return;
+        }
+
+        if (!is_array($value)) {
+            return;
+        }
+
+        foreach ($value as $nestedValue) {
+            $this->collectVerificationText($nestedValue, $pieces);
+        }
+    }
+
+    private function matchesUnclearDocumentText(string $text, string $serviceType): bool
+    {
+        $normalizedText = mb_strtolower(trim($text));
+        if ($normalizedText === '') {
+            return false;
+        }
+
+        if ($serviceType === 'individual' && $this->containsAnyText($normalizedText, [
+            'missing signature',
+            'signature missing',
+            'no signature',
+            'without signature',
+            'tiada tandatangan',
+            'tandatangan tiada',
+        ])) {
+            return true;
+        }
+
+        $unclearTerms = [
+            'unclear',
+            'blurry',
+            'blurred',
+            'blur ',
+            ' blur',
+            'unreadable',
+            'illegible',
+            'not clear',
+            'not readable',
+            'cannot be read',
+            'cannot read',
+            'poor quality',
+            'low quality',
+            'too dark',
+            'shadow',
+            'shadows',
+            'cropped',
+            'cropping',
+            'cut off',
+            'not crossed',
+            'crossed',
+            'does not meet',
+            'doesnt meet',
+            'does not meet the required standard',
+            'not meet',
+            'not meeting',
+            'required standard',
+            'tidak jelas',
+            'kabur',
+            'tidak boleh dibaca',
+            'tidak dapat dibaca',
+            'tidak memenuhi',
+            'tidak menepati',
+            'tidak dipalang',
+            'belum dipalang',
+        ];
+
+        if (!$this->containsAnyText($normalizedText, $unclearTerms)) {
+            return false;
+        }
+
+        $documentTerms = $serviceType === 'company'
+            ? [
+                'ic',
+                'identity card',
+                'mykad',
+                'passport',
+                'ssm',
+                'ppk',
+                'certificate',
+                'document',
+                'copy',
+                'image',
+                'photo',
+                'upload',
+                'uploaded',
+                'director',
+            ]
+            : [
+                'ic',
+                'identity card',
+                'mykad',
+                'passport',
+                'document',
+                'copy',
+                'image',
+                'photo',
+                'upload',
+                'uploaded',
+                'front',
+                'back',
+                'signature',
+            ];
+
+        return $this->containsAnyText($normalizedText, $documentTerms);
+    }
+
+    /**
+     * @param array<int, string> $terms
+     */
+    private function containsAnyText(string $text, array $terms): bool
+    {
+        foreach ($terms as $term) {
+            $needle = trim(mb_strtolower($term));
+            if ($needle === '') {
+                continue;
+            }
+
+            if (str_contains($needle, ' ') || str_contains($needle, '/') || str_contains($needle, '-')) {
+                if (str_contains($text, $needle)) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (preg_match('/\b' . preg_quote($needle, '/') . '\b/u', $text) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

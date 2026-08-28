@@ -1267,12 +1267,8 @@ async function renderCancellationSubmissionState(data, { fromRetry = false, allo
   );
   const nextAction = firstNonEmpty(data?.next_action, data?.nextAction, 'done').toLowerCase();
   const finalFailureType = firstNonEmpty(data?.final_failure_type, data?.finalFailureType, null);
-  const message = firstNonEmpty(
-    data?.message,
-    verification?.display_message,
-    verification?.response_message,
-    ''
-  );
+  const message = resolveCancellationCustomerMessage(data, verification);
+  const hasDisplayMessage = hasFinalVerificationDisplayMessage(verification);
 
   if (requestNumber) {
     state.requestNumber = requestNumber;
@@ -1290,7 +1286,7 @@ async function renderCancellationSubmissionState(data, { fromRetry = false, allo
     state.submission = request;
   }
 
-  if (data?.retry_available === true || nextAction === 'retry_available') {
+  if (hasDisplayMessage && data?.retry_available === true) {
     state.retryRequestIdentifier = requestNumber || state.requestNumber;
     state.step = 'awaiting_retry';
     uploadArea.style.display = 'none';
@@ -1301,7 +1297,7 @@ async function renderCancellationSubmissionState(data, { fromRetry = false, allo
 
     await addMsg(renderBotRichMessage(message || (en
       ? 'Cancellation attempt 1 was unsuccessful. Click Retry to try again.'
-      : 'Percubaan pertama pembatalan tidak berjaya. Klik Retry untuk mencuba semula.')), 'error');
+      : 'Percubaan pertama pembatalan tidak berjaya. Klik Retry untuk mencuba semula.')), 'bot');
     setQuickReplyActions([
       {
         label: en ? 'Retry' : 'Retry',
@@ -1801,6 +1797,32 @@ function extractVerificationCustomerMessage(verification) {
   }
 
   return message;
+}
+
+function resolveCancellationCustomerMessage(data, verification) {
+  const candidates = [
+    extractVerificationCustomerMessage(verification),
+    stripWrappingQuotes(firstNonEmpty(data?.message, '')),
+    stripWrappingQuotes(firstNonEmpty(isPlainObject(verification) ? verification.response_message : '', '')),
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+
+    if (looksLikeBotAcknowledgementText(candidate)) {
+      continue;
+    }
+
+    return candidate;
+  }
+
+  return '';
+}
+
+function hasFinalVerificationDisplayMessage(verification) {
+  return extractVerificationCustomerMessage(verification) !== '';
 }
 
 function delay(ms) {
@@ -3089,10 +3111,28 @@ async function submitIC() {
       resolvedDisplayMessageIsEmpty: !String(resolvedVerification?.display_message ?? '').trim(),
     });
 
+    if (botMessage && hasFinalVerificationDisplayMessage(resolvedVerification) && resolvedVerification?.retry_available === true) {
+      const retryReadyState = {
+        ...data,
+        verification: resolvedVerification,
+        retry_available: true,
+        next_action: 'retry_available',
+      };
+      const cancellationState = await renderCancellationSubmissionState(retryReadyState, { fromRetry: false });
+      if (cancellationState.handled) {
+        displayWaitSequence?.stop?.();
+        return;
+      }
+    }
+
     if (botMessage) {
       const refreshed = await refreshSubmission(identifier);
       if (isPlainObject(refreshed?.submission)) {
         state.submission = refreshed.submission;
+      }
+      if (refreshed && await renderCancellationSubmissionState(refreshed, { fromRetry: false })) {
+        displayWaitSequence?.stop?.();
+        return;
       }
     }
 
