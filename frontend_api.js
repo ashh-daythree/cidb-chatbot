@@ -163,6 +163,28 @@ function getCertificateDocumentLabel(en = state.en) {
   return en ? 'SSM / PPK Certificate' : 'Sijil SSM / PPK';
 }
 
+function buildUploadExampleSectionHtml() {
+  return (
+    '<div class="upload-example-section">'
+    + '<div class="upload-example-title">Example</div>'
+    + '<div class="upload-example-grid">'
+    + '<figure class="upload-example-card">'
+    + '<img src="assets/images/ic-front-example.png" alt="IC Front Example" class="upload-example-img" loading="lazy">'
+    + '<figcaption>IC Front Example</figcaption>'
+    + '</figure>'
+    + '<figure class="upload-example-card">'
+    + '<img src="assets/images/ic-back-example.png" alt="IC Back Example" class="upload-example-img" loading="lazy">'
+    + '<figcaption>IC Back Example</figcaption>'
+    + '</figure>'
+    + '</div>'
+    + '</div>'
+  );
+}
+
+function buildUploadTipHtml(messageHtml) {
+  return `${messageHtml}${buildUploadExampleSectionHtml()}`;
+}
+
 function getIdentityEditUi(en = state.en) {
   if (isCompanyService()) {
     return en ? {
@@ -2508,9 +2530,9 @@ async function handleStep(text) {
       state.companyReason = payload.value;
       state.step = 'ask_ic_copy';
       await showTyping(450);
-      await addMsg(state.en
+      await addMsg(buildUploadTipHtml(state.en
         ? 'Thank you. Please upload the director <strong>IC front</strong>, <strong>IC back</strong>, and the <strong>SSM / PPK certificate</strong>.'
-        : 'Terima kasih. Sila muat naik <strong>IC depan</strong>, <strong>IC belakang</strong>, dan <strong>sijil SSM / PPK</strong> pengarah.');
+        : 'Terima kasih. Sila muat naik <strong>IC depan</strong>, <strong>IC belakang</strong>, dan <strong>sijil SSM / PPK</strong> pengarah.'));
       setUploadLabels(state.en);
       state.identityEditEnabled = false;
       state.sigDataUrl = null;
@@ -2649,13 +2671,13 @@ async function handleStep(text) {
       state.step = 'ask_ic_copy';
       await showTyping(500);
       if (isPassportIdentityType()) {
-        await addMsg(state.en
+        await addMsg(buildUploadTipHtml(state.en
           ? 'Thank you. Please upload a clear copy of your <strong>Passport Information Page</strong>.<div class="warn-box">Photo tips:<br>- Keep the full page visible<br>- Avoid blur, shadows, or cropping<br>- Make sure all details are readable</div>'
-          : 'Terima kasih. Sila muat naik salinan <strong>Muka Surat Maklumat Pasport</strong> yang jelas.<div class="warn-box">Petua foto:<br>- Pastikan keseluruhan muka surat kelihatan<br>- Elakkan kabur, bayang, atau gambar terpotong<br>- Pastikan semua butiran boleh dibaca</div>');
+          : 'Terima kasih. Sila muat naik salinan <strong>Muka Surat Maklumat Pasport</strong> yang jelas.<div class="warn-box">Petua foto:<br>- Pastikan keseluruhan muka surat kelihatan<br>- Elakkan kabur, bayang, atau gambar terpotong<br>- Pastikan semua butiran boleh dibaca</div>'));
       } else {
-        await addMsg(state.en
+        await addMsg(buildUploadTipHtml(state.en
           ? 'Thank you. Please upload your <strong>IC copy (front & back)</strong>. Make sure the image is <strong>clear and fully visible</strong>.<div class="warn-box">Photo tips:<br>- Place IC on a flat, well-lit surface<br>- Avoid blur, shadows, or cropping<br>- Both front and back copies are required</div>'
-          : 'Terima kasih. Sila muat naik <strong>salinan IC (depan & belakang)</strong>. Pastikan gambar <strong>jelas dan tidak terpotong</strong>.<div class="warn-box">Petua foto:<br>- Letak IC di permukaan rata yang terang<br>- Elakkan kabur, bayang, atau gambar terpotong<br>- Salinan depan dan belakang diperlukan</div>');
+          : 'Terima kasih. Sila muat naik <strong>salinan IC (depan & belakang)</strong>. Pastikan gambar <strong>jelas dan tidak terpotong</strong>.<div class="warn-box">Petua foto:<br>- Letak IC di permukaan rata yang terang<br>- Elakkan kabur, bayang, atau gambar terpotong<br>- Salinan depan dan belakang diperlukan</div>'));
       }
       setUploadLabels(state.en);
       state.identityEditEnabled = false;
