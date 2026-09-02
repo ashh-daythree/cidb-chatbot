@@ -60,6 +60,21 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'OPTIONS') {
     return;
 }
 
+if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'GET'
+    && (parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/') === '/health'
+) {
+    if (PHP_SAPI !== 'cli') {
+        http_response_code(200);
+        header('Content-Type: application/json; charset=utf-8');
+    }
+
+    echo JsonHelper::encode([
+        'success' => true,
+        'status' => 'ok',
+    ]);
+    return;
+}
+
 /** @var ErrorHandler $errorHandler */
 $errorHandler = $container->get(ErrorHandler::class);
 $errorHandler->register();

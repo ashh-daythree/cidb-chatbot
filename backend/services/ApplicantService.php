@@ -11,6 +11,7 @@ use Cidb\Backend\Repositories\ReferenceLanguageRepository;
 use Cidb\Backend\Repositories\ReferenceMalaysianStateRepository;
 use Cidb\Backend\Validators\FullNameValidator;
 use Cidb\Backend\Validators\IdentityValidator;
+use Cidb\Backend\Utils\SensitiveDataCrypto;
 use Cidb\Backend\Utils\Exceptions\AppException;
 
 final class ApplicantService extends AbstractService
@@ -62,24 +63,20 @@ final class ApplicantService extends AbstractService
                 throw new AppException('Invalid language.', 422, 'LANGUAGE_INVALID');
             }
 
-            $payload = [
-                'session_id' => $sessionId,
-                'full_name' => $fullName,
-                'identity_type' => (string) ($identityResult->data()['identity_type'] ?? 'PASSPORT'),
-                'identity_number' => $identityNumber,
-                'identity_number_last4' => substr($identityNumber, -4),
-                'state_code' => $stateCode,
-                'language_code' => $languageCode,
-                'verification_status' => 'pending',
-                'is_draft' => false,
-                'created_at' => $this->now(),
-                'updated_at' => $this->now(),
-            ];
+            $payload = $this->buildEncryptedApplicantPayload(
+                $sessionId,
+                $fullName,
+                (string) ($identityResult->data()['identity_type'] ?? 'PASSPORT'),
+                $identityNumber,
+                $stateCode,
+                $languageCode,
+                false
+            );
 
             $existing = $this->applicantRepository->findBySessionId($sessionId);
             $applicant = $existing === null
                 ? $this->applicantRepository->insert($payload)
-                : $this->applicantRepository->update((string) $existing['id'], $payload);
+                : $this->applicantRepository->update((string) $existing['id'], $payload) ?? $existing;
 
             $this->auditService->record('applicant_finalized', 'Applicant profile finalized from session draft.', [
                 'session_id' => $sessionId,
@@ -88,6 +85,43 @@ final class ApplicantService extends AbstractService
 
             return $applicant ?? [];
         });
+    }
+
+    /**
+     * Builds the database payload without persisting plaintext sensitive values.
+     * The session draft remains the short-lived source for downstream submission data.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildEncryptedApplicantPayload(
+        string $sessionId,
+        string $fullName,
+        string $identityType,
+        string $identityNumber,
+        string $stateCode,
+        string $languageCode,
+        bool $includeCreatedAt
+    ): array {
+        $payload = [
+            'session_id' => $sessionId,
+            'full_name_ciphertext' => SensitiveDataCrypto::encrypt($fullName),
+            'full_name_hash' => hash('sha256', $fullName),
+            'identity_type' => $identityType,
+            'identity_number_ciphertext' => SensitiveDataCrypto::encrypt($identityNumber),
+            'identity_number_hash' => hash('sha256', strtoupper($identityNumber)),
+            'identity_number_last4' => substr($identityNumber, -4),
+            'state_code' => $stateCode,
+            'language_code' => $languageCode,
+            'verification_status' => 'pending',
+            'is_draft' => false,
+            'updated_at' => $this->now(),
+        ];
+
+        if ($includeCreatedAt) {
+            $payload['created_at'] = $this->now();
+        }
+
+        return $payload;
     }
 
     /**
@@ -135,24 +169,22 @@ final class ApplicantService extends AbstractService
                     throw new AppException('Invalid language.', 422, 'LANGUAGE_INVALID');
                 }
 
-                $existing = $this->applicantRepository->insert([
-                    'session_id' => $sessionId,
-                    'full_name' => $normalizedName,
-                    'identity_type' => $normalizedIdentityType !== '' ? $normalizedIdentityType : 'PASSPORT',
-                    'identity_number' => $normalizedIdentityNumber,
-                    'identity_number_last4' => substr($normalizedIdentityNumber, -4),
-                    'state_code' => $stateCode,
-                    'language_code' => $languageCode,
-                    'verification_status' => 'pending',
-                    'is_draft' => false,
-                    'created_at' => $this->now(),
-                    'updated_at' => $this->now(),
-                ]);
+                $existing = $this->applicantRepository->insert($this->buildEncryptedApplicantPayload(
+                    $sessionId,
+                    $normalizedName,
+                    $normalizedIdentityType !== '' ? $normalizedIdentityType : 'PASSPORT',
+                    $normalizedIdentityNumber,
+                    $stateCode,
+                    $languageCode,
+                    true
+                ));
             } else {
                 $existing = $this->applicantRepository->update((string) $existing['id'], [
-                    'full_name' => $normalizedName,
+                    'full_name_ciphertext' => SensitiveDataCrypto::encrypt($normalizedName),
+                    'full_name_hash' => hash('sha256', $normalizedName),
                     'identity_type' => $normalizedIdentityType !== '' ? $normalizedIdentityType : ($existing['identity_type'] ?? 'PASSPORT'),
-                    'identity_number' => $normalizedIdentityNumber,
+                    'identity_number_ciphertext' => SensitiveDataCrypto::encrypt($normalizedIdentityNumber),
+                    'identity_number_hash' => hash('sha256', strtoupper($normalizedIdentityNumber)),
                     'identity_number_last4' => substr($normalizedIdentityNumber, -4),
                     'updated_at' => $this->now(),
                 ]) ?? $existing;

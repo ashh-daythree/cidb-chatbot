@@ -1,0 +1,13 @@
+.git
+.codex
+.agents
+.env
+ocr/.env
+ocr/.venv
+**/__pycache__
+backend/logs
+backend/storage/documents
+backend/uploads
+ocr/ocr_service.log
+vendor
+*.pyc
