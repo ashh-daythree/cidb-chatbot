@@ -1784,7 +1784,7 @@ function getServiceQuickReplies() {
 }
 
 function faqApplicantCategoryOptions() {
-  return state.en ? ['Individual', 'Company'] : ['Individu', 'Syarikat'];
+  return state.en ? ['Company'] : ['Syarikat'];
 }
 
 function buildFaqApplicantCategoryPayload(text) {
@@ -2250,7 +2250,7 @@ async function submitAssistanceForm(formId) {
       }
     }
 
-    await apiRequest('/assistance/submit', {
+    const response = await apiRequest('/assistance/submit', {
       method: 'POST',
       body: {
         session_id: state.sessionId,
@@ -2275,10 +2275,27 @@ async function submitAssistanceForm(formId) {
       },
     });
 
-    const message = state.en
+    const fallback = state.en
       ? 'Thank you. Our team will contact you via email within 2 working days.'
       : 'Terima kasih. Pasukan kami akan menghubungi anda melalui e-mel dalam tempoh 2 hari bekerja.';
-    endFaqConversation(message);
+
+    const data = extractData(response) || {};
+    const verification = isPlainObject(data.verification) ? data.verification : null;
+    const identifier = data.request_number;
+
+    if (identifier && (data.next_action === 'poll' || verification?.result_status === 'pending')) {
+      const waitSequence = startDisplayMessageWaitSequence(state.en);
+      try {
+        const resolved = await waitForFinalVerificationMessage(identifier, verification);
+        endFaqConversation(resolved.message || fallback);
+      } finally {
+        waitSequence.stop();
+      }
+    } else {
+      endFaqConversation(
+        (verification && (verification.display_message || verification.response_message)) || fallback
+      );
+    }
   } catch (error) {
     await showApiError(error, state.en ? 'Unable to submit the assistance request.' : 'Tidak dapat menghantar permintaan bantuan.');
     if (submitBtn) submitBtn.disabled = false;

@@ -45,6 +45,77 @@ final class RequestService extends AbstractService
         });
     }
 
+    /**
+     * Creates (or returns the existing) `service_requests` row for a FAQ assistance
+     * enquiry. Unlike the cancellation creators there is no applicant record and no
+     * company/individual service-type requirement; the row is submitted immediately.
+     *
+     * @return array<string, mixed>
+     */
+    public function createFaqAssistanceRequest(string $sessionId): array
+    {
+        return $this->transactional(function () use ($sessionId): array {
+            $requestType = 'FAQ_ASSISTANCE_ENQUIRY';
+
+            $existing = $this->requestRepository->findBySessionId($sessionId);
+            if ($existing !== null) {
+                if ((string) ($existing['request_type_code'] ?? '') === $requestType) {
+                    return $existing;
+                }
+
+                throw new AppException(
+                    'This chat session already has a service request.',
+                    409,
+                    'SESSION_HAS_REQUEST'
+                );
+            }
+
+            $session = $this->sessionRepository->findById($sessionId);
+            if ($session === null) {
+                throw new AppException('Session not found.', 404, 'SESSION_NOT_FOUND');
+            }
+
+            $draft = $this->decodeDraft($session['draft_payload'] ?? []);
+
+            $workflowId = (string) ($session['workflow_id'] ?? '');
+            if ($workflowId === '' || $this->workflowRepository->findById($workflowId) === null) {
+                throw new AppException('Workflow not found.', 422, 'WORKFLOW_INVALID');
+            }
+
+            if ($this->requestTypeRepository->findActiveByCode($requestType) === null) {
+                throw new AppException('Request type is invalid.', 422, 'REQUEST_TYPE_INVALID');
+            }
+
+            $payload = [
+                'request_number' => $this->generateRequestNumber(),
+                'workflow_id' => $workflowId,
+                'session_id' => $sessionId,
+                'applicant_id' => null,
+                'request_type_code' => $requestType,
+                'status' => 'submitted',
+                'submission_language_code' => (string) ($session['language_code'] ?? $draft['language_code'] ?? 'en'),
+                'submitted_at' => $this->now(),
+                'latest_cims_status' => 'pending',
+                'final_outcome' => null,
+                'final_outcome_at' => null,
+                'closed_at' => null,
+                'created_at' => $this->now(),
+                'updated_at' => $this->now(),
+            ];
+
+            $request = $this->requestRepository->insert($payload);
+
+            $this->auditService->record('request_created', 'FAQ assistance service request created.', [
+                'session_id' => $sessionId,
+                'request_id' => $request['id'] ?? null,
+                'request_number' => $request['request_number'] ?? null,
+                'request_type_code' => $requestType,
+            ], 'info', $sessionId, $request['id'] ?? null);
+
+            return $request;
+        });
+    }
+
     public function markSubmitted(string $requestId): array
     {
         return $this->transactional(function () use ($requestId): array {
