@@ -2047,6 +2047,9 @@ const ASSISTANCE_CLASSIFICATION_OPTIONS = {
   sub_category_2: ['Prosedur pembaharuan PPK/SPKK/STB'],
 };
 
+// Renewal type sent to the RPA bot as sCustomerType. Codes only, no translation.
+const ASSISTANCE_TOPIC_OPTIONS = ['PPK', 'SPKK', 'STB'];
+
 function assistanceOptionListHtml(values, selectedValue = values[0]) {
   return values.map(value => {
     const selected = String(value) === String(selectedValue) ? ' selected' : '';
@@ -2071,6 +2074,7 @@ function renderAssistanceForm() {
     phone: 'Mobile Number',
     email: 'Email Address',
     enquiryTitle: 'Enquiry Title',
+    topic: 'Renewal Type',
     enquiryDescription: 'Enquiry Description',
     idNumber: 'MyKad / Passport No.',
     companyName: 'Company Name',
@@ -2096,6 +2100,7 @@ function renderAssistanceForm() {
     phone: 'No. Telefon Bimbit',
     email: 'Alamat E-mel',
     enquiryTitle: 'Tajuk Maklumbalas',
+    topic: 'Jenis Pembaharuan',
     enquiryDescription: 'Huraian Maklumbalas',
     idNumber: 'No. MyKad / Pasport',
     companyName: 'Nama Syarikat',
@@ -2123,6 +2128,12 @@ function renderAssistanceForm() {
     return `<option value="${value}"${selected}>${escapeHtml(text)}</option>`;
   }).join('');
 
+  const topicOptionsHtml = `<option value="">${escapeHtml(labels.selectPlaceholder)}</option>`
+    + ASSISTANCE_TOPIC_OPTIONS.map(code => {
+      const selected = code === (state.faqTopicCode || '') ? ' selected' : '';
+      return `<option value="${escapeHtml(code)}"${selected}>${escapeHtml(code)}</option>`;
+    }).join('');
+
   const docSlotsHtml = [1, 2, 3].map(n => `<label>${escapeHtml(labels.document)} #${n} (${escapeHtml(labels.optional)})
       <input type="file" id="${formId}-doc-${n}" />
     </label>`).join('');
@@ -2133,6 +2144,9 @@ function renderAssistanceForm() {
     <h5>${escapeHtml(labels.sectionFeedback)}</h5>
     <label>${escapeHtml(labels.enquiryTitle)}
       <input type="text" id="${formId}-enquiry-title" value="${escapeHtml(state.faqEnquiryTitle || '')}" />
+    </label>
+    <label>${escapeHtml(labels.topic)}
+      <select id="${formId}-topic">${topicOptionsHtml}</select>
     </label>
     <label>${escapeHtml(labels.state)}
       <select id="${formId}-state">${stateOptionsHtml}</select>
@@ -2206,6 +2220,7 @@ async function submitAssistanceForm(formId) {
   const getValue = (suffix) => String(document.getElementById(`${formId}-${suffix}`)?.value || '').trim();
 
   const enquiryTitle = getValue('enquiry-title');
+  const topicCode = getValue('topic');
   const stateName = getValue('state');
   const description = getValue('description');
   const customerName = getValue('customer-name');
@@ -2220,10 +2235,29 @@ async function submitAssistanceForm(formId) {
   const subCategory1 = getValue('sub-category-1');
   const subCategory2 = getValue('sub-category-2');
 
-  if (!enquiryTitle || !stateName || !description || !customerName || !idNumber
-    || !phone || !email || !casesCategory || !subCategory1 || !subCategory2
-    || (isCompany && (!companyName || !companyRegNo))) {
-    await showApiError({ message: state.en ? 'Please complete all required fields.' : 'Sila lengkapkan semua medan yang diperlukan.' });
+  const requiredFields = [
+    [enquiryTitle, state.en ? 'Enquiry Title' : 'Tajuk Maklumbalas'],
+    [topicCode, state.en ? 'Renewal Type' : 'Jenis Pembaharuan'],
+    [stateName, state.en ? 'State Involved' : 'Negeri Terlibat'],
+    [description, state.en ? 'Enquiry Description' : 'Huraian Maklumbalas'],
+    [customerName, state.en ? 'Name' : 'Nama'],
+    [idNumber, state.en ? 'MyKad / Passport No.' : 'No. MyKad / Pasport'],
+    [phone, state.en ? 'Mobile Number' : 'No. Telefon Bimbit'],
+    [email, state.en ? 'Email Address' : 'Alamat E-mel'],
+    [casesCategory, state.en ? 'Cases Category' : 'Kategori Kes'],
+    [subCategory1, state.en ? 'Sub Category Level 1' : 'Sub Kategori Tahap 1'],
+    [subCategory2, state.en ? 'Sub Category Level 2' : 'Sub Kategori Tahap 2'],
+  ];
+  if (isCompany) {
+    requiredFields.push([companyName, state.en ? 'Company Name' : 'Nama Syarikat']);
+    requiredFields.push([companyRegNo, state.en ? 'Company Registration No.' : 'No. Pendaftaran Syarikat']);
+  }
+
+  const missing = requiredFields.filter(([value]) => !value).map(([, label]) => label);
+  if (missing.length) {
+    await showApiError({
+      message: (state.en ? 'Please complete: ' : 'Sila lengkapkan: ') + missing.join(', '),
+    });
     return;
   }
   if (!buildEmailPayload(email) || !buildMobilePayload(phone)) {
@@ -2253,6 +2287,8 @@ async function submitAssistanceForm(formId) {
         state: stateName,
         customer_name: customerName,
         applicant_category: applicantCategory,
+        topic_code: topicCode,
+        language_code: state.languageCode || (state.en ? 'en' : 'ms'),
         phone,
         email,
         enquiry_title: enquiryTitle,
