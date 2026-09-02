@@ -31,13 +31,9 @@ final class AssistanceRequestService extends AbstractService
     public function submit(array $payload): array
     {
         $sessionId = $this->requireField($payload, 'session_id', 'SESSION_ID_REQUIRED');
-        $applicantCategory = strtolower($this->requireField($payload, 'applicant_category', 'APPLICANT_CATEGORY_REQUIRED'));
 
-        if (!in_array($applicantCategory, ['individual', 'company'], true)) {
-            throw new AppException('Applicant category must be individual or company.', 422, 'APPLICANT_CATEGORY_INVALID', [
-                'applicant_category' => 'Applicant category must be individual or company.',
-            ]);
-        }
+        // The enquiry form is company-only — the RPA scenario requires sCompanyName + sSSMNumber.
+        $applicantCategory = 'company';
 
         $topicCode = strtoupper($this->requireField($payload, 'topic_code', 'TOPIC_CODE_REQUIRED'));
         if (!in_array($topicCode, self::TOPIC_CODES, true)) {
@@ -56,8 +52,8 @@ final class AssistanceRequestService extends AbstractService
             'enquiry_title' => $this->requireField($payload, 'enquiry_title', 'ENQUIRY_TITLE_REQUIRED'),
             'enquiry_description' => $this->requireField($payload, 'enquiry_description', 'ENQUIRY_DESCRIPTION_REQUIRED'),
             'id_number' => $this->requireField($payload, 'id_number', 'ID_NUMBER_REQUIRED'),
-            'company_name' => null,
-            'company_registration_no' => null,
+            'company_name' => $this->requireField($payload, 'company_name', 'COMPANY_NAME_REQUIRED'),
+            'company_registration_no' => $this->requireField($payload, 'company_registration_no', 'COMPANY_REGISTRATION_NO_REQUIRED'),
             'cases_category' => $this->requireField($payload, 'cases_category', 'CASES_CATEGORY_REQUIRED'),
             'sub_category_1' => $this->requireField($payload, 'sub_category_1', 'SUB_CATEGORY_1_REQUIRED'),
             'sub_category_2' => $this->requireField($payload, 'sub_category_2', 'SUB_CATEGORY_2_REQUIRED'),
@@ -68,11 +64,6 @@ final class AssistanceRequestService extends AbstractService
             'created_at' => $this->now(),
             'updated_at' => $this->now(),
         ];
-
-        if ($applicantCategory === 'company') {
-            $data['company_name'] = $this->requireField($payload, 'company_name', 'COMPANY_NAME_REQUIRED');
-            $data['company_registration_no'] = $this->requireField($payload, 'company_registration_no', 'COMPANY_REGISTRATION_NO_REQUIRED');
-        }
 
         [$assistanceRequest, $serviceRequest] = $this->transactional(function () use ($data, $sessionId, $topicCode): array {
             $assistanceRequest = $this->assistanceRequestRepository->insert($data);
@@ -105,6 +96,8 @@ final class AssistanceRequestService extends AbstractService
                 'topic_code' => $topicCode,
                 'customer_name' => $data['customer_name'],
                 'id_number' => $data['id_number'],
+                'company_name' => $data['company_name'],
+                'company_registration_no' => $data['company_registration_no'],
                 'phone' => $data['phone'],
                 'email' => $data['email'],
                 'state' => $data['state'],

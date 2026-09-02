@@ -2030,7 +2030,7 @@ function assistanceOptionListHtml(values, selectedValue = values[0]) {
 function renderAssistanceForm() {
   assistanceFormIdCounter += 1;
   const formId = `assistance-form-${assistanceFormIdCounter}`;
-  const isCompany = state.faqApplicantCategory === 'company';
+  const isCompany = true; // enquiry form is company-only
 
   const labels = state.en ? {
     title: 'Assistance Form',
@@ -2092,10 +2092,9 @@ function renderAssistanceForm() {
       return `<option value="${escapeHtml(item)}"${selected}>${escapeHtml(item)}</option>`;
     }).join('');
 
-  const categoryOptionsHtml = ['individual', 'company'].map(value => {
-    const selected = value === (state.faqApplicantCategory || 'company') ? ' selected' : '';
+  const categoryOptionsHtml = ['company'].map(value => {
     const text = value === 'company' ? labels.company : labels.individual;
-    return `<option value="${value}"${selected}>${escapeHtml(text)}</option>`;
+    return `<option value="${value}" selected>${escapeHtml(text)}</option>`;
   }).join('');
 
   const topicOptionsHtml = `<option value="">${escapeHtml(labels.selectPlaceholder)}</option>`
@@ -2195,8 +2194,8 @@ async function submitAssistanceForm(formId) {
   const description = getValue('description');
   const customerName = getValue('customer-name');
   const idNumber = getValue('id-number');
-  const applicantCategory = getValue('category') === 'company' ? 'company' : 'individual';
-  const isCompany = applicantCategory === 'company';
+  const applicantCategory = 'company'; // enquiry form is company-only
+  const isCompany = true;
   const companyName = getValue('company-name');
   const companyRegNo = getValue('company-reg-no');
   const phone = getValue('phone');
@@ -2264,8 +2263,8 @@ async function submitAssistanceForm(formId) {
         enquiry_title: enquiryTitle,
         enquiry_description: description,
         id_number: idNumber,
-        company_name: isCompany ? companyName : null,
-        company_registration_no: isCompany ? companyRegNo : null,
+        company_name: companyName,
+        company_registration_no: companyRegNo,
         cases_category: casesCategory,
         sub_category_1: subCategory1,
         sub_category_2: subCategory2,
