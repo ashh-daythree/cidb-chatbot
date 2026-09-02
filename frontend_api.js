@@ -1784,7 +1784,7 @@ function getServiceQuickReplies() {
 }
 
 function faqApplicantCategoryOptions() {
-  return state.en ? ['Individual', 'Company'] : ['Individu', 'Syarikat'];
+  return state.en ? ['Company'] : ['Syarikat'];
 }
 
 function buildFaqApplicantCategoryPayload(text) {
