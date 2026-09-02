@@ -11,6 +11,7 @@ final class CompanyPpkValidator extends AbstractValidator
      *
      * Accepted formats:
      * - Modern 12-digit SSM number: YYYYXXNNNNNN where XX is 01-06
+     * - PPK/SSM prefix number such as JM0772808
      * - Legacy registry numbers such as 1234567-A or SA0000001-D
      */
     public function validate(mixed $input, string $field = 'ppk_number'): ValidationResult
@@ -39,6 +40,13 @@ final class CompanyPpkValidator extends AbstractValidator
             ]);
         }
 
+        if ($this->isPpkSsmPrefixNumber($normalized)) {
+            return ValidationResult::success([
+                'ppk_number' => $normalized,
+                'ppk_number_format' => 'ppk_ssm_prefix',
+            ]);
+        }
+
         return $this->invalid($field, 'ppk_invalid', 'PPK / SSM number is invalid.', $normalized);
     }
 
@@ -56,5 +64,10 @@ final class CompanyPpkValidator extends AbstractValidator
     private function isLegacySsmNumber(string $value): bool
     {
         return preg_match('/^(?:[A-Z]{0,3})\d{7}-[A-Z]$/', $value) === 1;
+    }
+
+    private function isPpkSsmPrefixNumber(string $value): bool
+    {
+        return preg_match('/^[A-Z]{2}\d{7}$/', $value) === 1;
     }
 }
