@@ -228,7 +228,7 @@ def evaluate_mykad_front(
     result = _keyword_result(
         lines=lines,
         keyword_weights=MYKAD_FRONT_KEYWORDS,
-        required_score=7,
+        required_score=5,
         has_document_number=bool(extracted_nric),
     )
 
