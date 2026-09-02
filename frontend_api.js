@@ -9,8 +9,8 @@ const FILE_POLICY = {
 const MY_STATES = ['Johor', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Perak', 'Perlis',
   'Pulau Pinang', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu',
   'W.P. Kuala Lumpur', 'W.P. Labuan', 'W.P. Putrajaya'];
-const PRIORITY_INDIVIDUAL_STATE_ORDER = ['Selangor', 'Johor', 'W.P. Kuala Lumpur', 'Sarawak', 'Pulau Pinang'];
-const PRIORITY_INDIVIDUAL_STATE_SET = new Set(PRIORITY_INDIVIDUAL_STATE_ORDER);
+const PRIORITY_STATE_ORDER = ['Selangor', 'Johor', 'W.P. Kuala Lumpur', 'Sarawak', 'Pulau Pinang'];
+const PRIORITY_STATE_SET = new Set(PRIORITY_STATE_ORDER);
 
 const messagesEl = document.getElementById('chatMessages');
 const chatWrapperEl = document.querySelector('.chat-wrapper');
@@ -531,7 +531,7 @@ function fillRetryEditStateOptions() {
     blankOption.value = '';
     blankOption.textContent = state.en ? 'Select state' : 'Pilih negeri';
     select.appendChild(blankOption);
-    MY_STATES.forEach(item => {
+    getStateSelectionOptions().forEach(item => {
       const option = document.createElement('option');
       option.value = item;
       option.textContent = item;
@@ -1811,9 +1811,9 @@ function isRenewalFaqQuery(text) {
   ].some(keyword => value.includes(keyword));
 }
 
-function getIndividualCancellationStateOptions() {
-  const priorityStates = PRIORITY_INDIVIDUAL_STATE_ORDER.filter(item => MY_STATES.includes(item));
-  const remainingStates = MY_STATES.filter(item => !PRIORITY_INDIVIDUAL_STATE_SET.has(item));
+function getStateSelectionOptions() {
+  const priorityStates = PRIORITY_STATE_ORDER.filter(item => MY_STATES.includes(item));
+  const remainingStates = MY_STATES.filter(item => !PRIORITY_STATE_SET.has(item));
   return [...priorityStates, ...remainingStates];
 }
 
@@ -2120,7 +2120,7 @@ function renderAssistanceForm() {
   };
 
   const stateOptionsHtml = `<option value="">${escapeHtml(labels.selectPlaceholder)}</option>`
-    + MY_STATES.map(item => {
+    + getStateSelectionOptions().map(item => {
       const selected = item === (state.stateName || '') ? ' selected' : '';
       return `<option value="${escapeHtml(item)}"${selected}>${escapeHtml(item)}</option>`;
     }).join('');
@@ -2867,7 +2867,7 @@ async function handleStep(text) {
       await addMsg(state.en
         ? 'Before we begin, may I know which <strong>state</strong> you are contacting us from?'
         : 'Sebelum kita mulakan, bolehkah saya tahu dari <strong>negeri</strong> mana anda menghubungi kami?');
-      setQR(getIndividualCancellationStateOptions());
+      setQR(getStateSelectionOptions());
       setInput(true);
       await refreshSession();
       return;
@@ -2930,7 +2930,7 @@ async function handleStep(text) {
     state.step = 'ask_faq_customer_state';
     await showTyping(400);
     await addMsg(state.en ? 'Which <strong>state</strong> are you contacting us from?' : 'Dari <strong>negeri</strong> manakah anda menghubungi kami?');
-    setQR(MY_STATES);
+    setQR(getStateSelectionOptions());
     setInput(true);
     return;
   }
@@ -2940,7 +2940,7 @@ async function handleStep(text) {
     if (!payload) {
       await showApiError({ message: 'Invalid Malaysian state selected.', errors: { state: 'Please choose a valid Malaysian state.' } }, 'Invalid Malaysian state selected.');
       await addMsg(state.en ? 'Which <strong>state</strong> are you contacting us from?' : 'Dari <strong>negeri</strong> manakah anda menghubungi kami?');
-      setQR(MY_STATES);
+      setQR(getStateSelectionOptions());
       setInput(true);
       return;
     }
@@ -3008,7 +3008,7 @@ async function handleStep(text) {
     if (!payload) {
       await showApiError({ message: 'Invalid Malaysian state selected.', errors: { state: 'Please choose a valid Malaysian state.' } }, 'Invalid Malaysian state selected.');
       await addMsg(state.en ? 'Before we continue, may I know which <strong>state</strong> you are contacting us from?' : 'Sebelum kita teruskan, bolehkah saya tahu dari <strong>negeri</strong> mana anda menghubungi kami?');
-      setQR(getIndividualCancellationStateOptions());
+      setQR(getStateSelectionOptions());
       setInput(true);
       return;
     }
@@ -3032,7 +3032,7 @@ async function handleStep(text) {
     } catch (error) {
       await showApiError(error, 'Unable to save state.');
       await addMsg(state.en ? 'Before we continue, may I know which <strong>state</strong> you are contacting us from?' : 'Sebelum kita teruskan, bolehkah saya tahu dari <strong>negeri</strong> mana anda menghubungi kami?');
-      setQR(getIndividualCancellationStateOptions());
+      setQR(getStateSelectionOptions());
       setInput(true);
       return;
     }
@@ -3140,7 +3140,7 @@ async function handleStep(text) {
       await addMsg(state.en
         ? 'Please provide the <strong>company state</strong> for RPA verification.'
         : 'Sila berikan <strong>negeri syarikat</strong> untuk pengesahan RPA.');
-      setQR(MY_STATES);
+      setQR(getStateSelectionOptions());
       setInput(true);
       await refreshSession();
       return;
@@ -3159,7 +3159,7 @@ async function handleStep(text) {
       await addMsg(state.en
         ? 'Please provide the <strong>company state</strong> for RPA verification.'
         : 'Sila berikan <strong>negeri syarikat</strong> untuk pengesahan RPA.');
-      setQR(MY_STATES);
+      setQR(getStateSelectionOptions());
       setInput(true);
       return;
     }
