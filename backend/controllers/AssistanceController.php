@@ -16,10 +16,8 @@ final class AssistanceController extends AbstractController
     public function submit(array $request): array
     {
         $payload = $this->payload($request);
-        $assistanceRequest = $this->assistanceRequestService->submit($payload);
+        $result = $this->assistanceRequestService->submit($payload);
 
-        return $this->success([
-            'assistance_request' => $assistanceRequest,
-        ], 'Assistance request submitted.', 201);
+        return $this->success($result, 'Assistance request submitted.', 201);
     }
 }

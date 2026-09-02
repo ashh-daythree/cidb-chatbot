@@ -13,6 +13,9 @@ use Cidb\Backend\Utils\Logger;
 
 final class VerificationService extends AbstractService
 {
+    /** The RPA bot expects the spoken-language name in sLanguage, not the ISO code. */
+    private const RPA_LANGUAGE_WORDS = ['ms' => 'Malay', 'en' => 'English'];
+
     public function __construct(
         DatabaseConnection $connection,
         private readonly CimsVerificationResultRepository $cimsResultRepository,
@@ -117,6 +120,82 @@ final class VerificationService extends AbstractService
             'quick_replies' => $normalized['quick_replies'],
             'bot_response_text' => $rawBotText !== '' ? $rawBotText : (string) ($botResult['raw_response_text'] ?? ''),
             'bot_response_body' => $verification['response_payload'] ?? ($botResult['parsed_response'] ?? null),
+            'http_status' => $botResult['status_code'] ?? null,
+            'request_payload' => $botPayload,
+            'is_pending' => ($verification['result_status'] ?? null) === 'pending',
+        ]);
+    }
+
+    /**
+     * Fires the RPA ticket-insert bot for a FAQ assistance enquiry and records the
+     * acknowledgement as a `cims_verification_results` row (mirrors verifyCims, without
+     * the cancellation-specific outcome handling). The RPA later writes the result back
+     * into the same row; the chatbot polls `GET /submission/{id}` until then.
+     *
+     * @param array<string, mixed> $context topic_code, customer_name, id_number, phone, email, state, language_code
+     * @return array<string, mixed>
+     */
+    public function verifyFaqAssistance(string $requestId, array $context, int $sAttempt = 1): array
+    {
+        $traceId = $this->uuid();
+        $this->logger->debug('RPA trace verifyFaqAssistance start.', [
+            'trace_id' => $traceId,
+            'request_id' => $requestId,
+            'timestamp' => $this->now(),
+        ]);
+
+        $request = $this->requestRepository->findById($requestId);
+        if ($request === null) {
+            throw new AppException('Request not found.', 404, 'REQUEST_NOT_FOUND');
+        }
+
+        $botPayload = $this->buildFaqAssistanceBotPayload($context, $sAttempt);
+        $botResult = $this->rpaBotService->triggerTicketInsert($botPayload);
+        $normalized = $this->normalizeBotResult($botResult);
+        $rawBotText = trim((string) ($botResult['raw_response_text'] ?? ''));
+
+        $verification = $this->transactional(function () use ($requestId, $context, $sAttempt, $normalized, $botResult, $traceId, $rawBotText): array {
+            $payload = [
+                'request_id' => $requestId,
+                'attempt_no' => $this->nextAttemptNumber($requestId),
+                'result_status' => $normalized['result_status'],
+                'retry_available' => (bool) ($normalized['retry_available'] ?? false),
+                'response_code' => $normalized['response_code'],
+                'response_message' => $normalized['response_message'],
+                'external_reference_no' => $normalized['external_reference_no'],
+                'latency_ms' => $botResult['duration_ms'] ?? null,
+                'rpa_response_text' => $rawBotText !== '' ? $rawBotText : (string) ($normalized['rpa_response_text'] ?? ''),
+                'display_message' => trim((string) ($normalized['display_message'] ?? '')),
+                'response_payload' => JsonHelper::encode([
+                    'context' => array_merge($context, ['sAttempt' => $sAttempt]),
+                    'bot_response' => $botResult['parsed_response'] ?? $botResult['raw_response_text'] ?? null,
+                ], true),
+                'verified_at' => $this->now(),
+                'created_at' => $this->now(),
+            ];
+
+            $inserted = $this->cimsResultRepository->insert($payload);
+
+            $this->logger->debug('RPA trace FAQ assistance verification row inserted.', [
+                'trace_id' => $traceId,
+                'request_id' => $requestId,
+                'verification_id' => $inserted['id'] ?? null,
+                'result_status' => $inserted['result_status'] ?? null,
+            ]);
+
+            return $inserted;
+        });
+
+        $this->auditService->record('faq_assistance_verification_completed', 'FAQ assistance RPA bot triggered.', [
+            'request_id' => $requestId,
+            'status' => $verification['result_status'] ?? $normalized['result_status'],
+            'http_status' => $botResult['status_code'] ?? null,
+        ], 'info', null, $requestId, 'integration');
+
+        return array_merge($verification, [
+            'response_message' => (string) ($verification['response_message'] ?? $normalized['response_message']),
+            'display_message' => trim((string) ($verification['display_message'] ?? '')),
+            'bot_response_text' => $rawBotText !== '' ? $rawBotText : (string) ($botResult['raw_response_text'] ?? ''),
             'http_status' => $botResult['status_code'] ?? null,
             'request_payload' => $botPayload,
             'is_pending' => ($verification['result_status'] ?? null) === 'pending',
@@ -346,6 +425,51 @@ final class VerificationService extends AbstractService
         $this->assertBotPayloadReady($botPayload);
 
         return $botPayload;
+    }
+
+    /**
+     * Builds the RPA ticket-insert payload for a FAQ assistance enquiry. Same envelope
+     * and same eight `fields` as buildBotPayload(); differs only in sCustomerType (the
+     * PPK/SPKK/STB renewal type) and sLanguage (the spoken-language word).
+     *
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
+    private function buildFaqAssistanceBotPayload(array $context, int $sAttempt): array
+    {
+        $botPayload = [
+            'company' => 'CIDB',
+            'scenario_key' => 'cidb_masterbot',
+            'channel' => 'Chatbot',
+            'fields' => [
+                'sCustomerType' => strtoupper(trim((string) ($context['topic_code'] ?? ''))),
+                'sCustomerName' => $this->resolveBotPayloadValue([$context['customer_name'] ?? null]),
+                'sIdentificationNumber' => $this->resolveBotPayloadValue([$context['id_number'] ?? null]),
+                'sContactNumber' => $this->resolveBotPayloadValue([$context['phone'] ?? null]),
+                'sEmail' => $this->resolveBotPayloadValue([$context['email'] ?? null]),
+                'sLocationArea' => $this->resolveBotPayloadValue([$context['state'] ?? null]),
+                'sLanguage' => $this->rpaLanguageWord($context['language_code'] ?? null),
+                'sAttempt' => (string) $sAttempt,
+            ],
+        ];
+
+        $this->assertBotPayloadReady($botPayload);
+
+        return $botPayload;
+    }
+
+    /**
+     * Maps an ISO language code to the spoken-language word the RPA bot expects.
+     * Falls back to the trimmed input so assertBotPayloadReady still passes.
+     */
+    private function rpaLanguageWord(?string $code): ?string
+    {
+        $normalized = strtolower(trim((string) $code));
+        if ($normalized === '') {
+            return null;
+        }
+
+        return self::RPA_LANGUAGE_WORDS[$normalized] ?? $normalized;
     }
 
     /**
