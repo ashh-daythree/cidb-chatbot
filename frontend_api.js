@@ -1,5 +1,9 @@
+const isDevStaticHost = (
+  window.location.port === '5500'
+  && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+);
 const API_BASE_URL = window.location.protocol === 'file:'
-  || (window.location.hostname === 'localhost' && window.location.port === '5500')
+  || isDevStaticHost
   ? 'http://localhost:8000'
   : window.location.origin;
 const WORKFLOW_CODE = 'CIDB_EMAIL_ID_CANCELLATION';
