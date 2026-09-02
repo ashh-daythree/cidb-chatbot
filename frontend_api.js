@@ -9,6 +9,8 @@ const FILE_POLICY = {
 const MY_STATES = ['Johor', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Perak', 'Perlis',
   'Pulau Pinang', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu',
   'W.P. Kuala Lumpur', 'W.P. Labuan', 'W.P. Putrajaya'];
+const PRIORITY_INDIVIDUAL_STATE_ORDER = ['Selangor', 'Johor', 'W.P. Kuala Lumpur', 'Sarawak', 'Pulau Pinang'];
+const PRIORITY_INDIVIDUAL_STATE_SET = new Set(PRIORITY_INDIVIDUAL_STATE_ORDER);
 
 const messagesEl = document.getElementById('chatMessages');
 const chatWrapperEl = document.querySelector('.chat-wrapper');
@@ -1809,6 +1811,12 @@ function isRenewalFaqQuery(text) {
   ].some(keyword => value.includes(keyword));
 }
 
+function getIndividualCancellationStateOptions() {
+  const priorityStates = PRIORITY_INDIVIDUAL_STATE_ORDER.filter(item => MY_STATES.includes(item));
+  const remainingStates = MY_STATES.filter(item => !PRIORITY_INDIVIDUAL_STATE_SET.has(item));
+  return [...priorityStates, ...remainingStates];
+}
+
 function getServiceQuickReplies() {
   return state.en ? SERVICE_OPTIONS.en : SERVICE_OPTIONS.ms;
 }
@@ -2859,7 +2867,7 @@ async function handleStep(text) {
       await addMsg(state.en
         ? 'Before we begin, may I know which <strong>state</strong> you are contacting us from?'
         : 'Sebelum kita mulakan, bolehkah saya tahu dari <strong>negeri</strong> mana anda menghubungi kami?');
-      setQR(MY_STATES);
+      setQR(getIndividualCancellationStateOptions());
       setInput(true);
       await refreshSession();
       return;
@@ -3000,7 +3008,7 @@ async function handleStep(text) {
     if (!payload) {
       await showApiError({ message: 'Invalid Malaysian state selected.', errors: { state: 'Please choose a valid Malaysian state.' } }, 'Invalid Malaysian state selected.');
       await addMsg(state.en ? 'Before we continue, may I know which <strong>state</strong> you are contacting us from?' : 'Sebelum kita teruskan, bolehkah saya tahu dari <strong>negeri</strong> mana anda menghubungi kami?');
-      setQR(MY_STATES);
+      setQR(getIndividualCancellationStateOptions());
       setInput(true);
       return;
     }
@@ -3024,7 +3032,7 @@ async function handleStep(text) {
     } catch (error) {
       await showApiError(error, 'Unable to save state.');
       await addMsg(state.en ? 'Before we continue, may I know which <strong>state</strong> you are contacting us from?' : 'Sebelum kita teruskan, bolehkah saya tahu dari <strong>negeri</strong> mana anda menghubungi kami?');
-      setQR(MY_STATES);
+      setQR(getIndividualCancellationStateOptions());
       setInput(true);
       return;
     }
