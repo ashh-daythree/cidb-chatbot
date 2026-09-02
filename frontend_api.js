@@ -67,23 +67,9 @@ const retryEditCompanyReason = document.getElementById('retryEditCompanyReason')
 
 const FILE_SLOTS = ['front', 'back', 'certificate'];
 const SLOT_DOC_TYPES = { front: 'IC_FRONT', back: 'IC_BACK', certificate: 'SSM_PPK_CERTIFICATE' };
-const WAIT_MESSAGE_INTERVAL_MS = 2400;
 const FINAL_VERIFICATION_TIMEOUT_MS = 10 * 60 * 1000;
 const DEBUG_RPA_FLOW = true;
 const SUBMISSION_CONTEXT_STORAGE_KEY = 'cidb_submission_context';
-const WAIT_MESSAGES = {
-  en: [
-    'Thank you for waiting. We are checking your details now...',
-    'We are still verifying your information. Please stay with us...',
-    'Almost there. Your request is still being processed...',
-  ],
-  ms: [
-    'Terima kasih kerana menunggu. Kami sedang menyemak maklumat anda sekarang...',
-    'Kami masih mengesahkan maklumat anda. Sila terus bersama kami...',
-    'Hampir selesai. Permohonan anda masih diproses...',
-  ],
-};
-
 let liveAgentDockResizeObserver = null;
 
 const SUBMISSION_HOLD_MESSAGE = {
@@ -98,7 +84,7 @@ const SERVICE_OPTIONS = {
     { value: 'faq', label: '3. PPK/SPKK/STB Renewal Process' },
   ],
   ms: [
-    { value: 'individual', label: '1. Pembatalan Email ID Individu' },
+    { value: 'individual', label: '1. Pembatalan Email IC Individu' },
     { value: 'company', label: '2. Pembatalan Email ID Syarikat' },
     { value: 'faq', label: '3. Proses Pembaharuan PPK/SPKK/STB' },
   ],
@@ -940,39 +926,14 @@ function sanitizeBotHtml(html) {
 }
 
 function renderBotRichMessage(message) {
-  return sanitizeBotHtml(String(message || ''));
+  return sanitizeBotHtml(String(message || '').replace(/\bRPA\b\s*/gi, ''));
 }
 
 function startWaitMessageSequence(en) {
-  const messages = en ? WAIT_MESSAGES.en : WAIT_MESSAGES.ms;
-  const bubble = document.createElement('div');
-  bubble.className = 'msg bot wait-message';
-  let index = 0;
-  let stopped = false;
-
-  const renderCurrent = () => {
-    bubble.innerHTML = renderBackendMessage(messages[index]);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  };
-
-  renderCurrent();
-  messagesEl.appendChild(bubble);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-
-  const timer = setInterval(() => {
-    if (stopped) return;
-    index = (index + 1) % messages.length;
-    renderCurrent();
-  }, WAIT_MESSAGE_INTERVAL_MS);
-
+  const typingBubble = startTypingBubble();
   return {
     stop() {
-      if (stopped) {
-        return;
-      }
-      stopped = true;
-      clearInterval(timer);
-      bubble.remove();
+      typingBubble.stop();
     },
   };
 }
@@ -1054,6 +1015,7 @@ function startTypingBubble() {
 
   let stopped = false;
   return {
+    bubble,
     stop() {
       if (stopped) {
         return;
@@ -1922,8 +1884,8 @@ async function startFaqCustomerInfoCollection() {
   state.step = 'ask_faq_customer_name';
   await showTyping(400);
   await addMsg(state.en
-    ? 'To help us assist you more accurately, please provide the following information:<div class="info-box">1. Full Name<br>2. Phone Number<br>3. State<br>4. Applicant Category (Individual / Company)<br>5. Personal Email<br>6. Company Email (required if Applicant Category = Company)</div>'
-    : 'Untuk membantu kami membantu anda dengan lebih tepat, sila berikan maklumat berikut:<div class="info-box">1. Nama Penuh<br>2. Nombor Telefon<br>3. Negeri<br>4. Kategori Pemohon (Individu / Syarikat)<br>5. Emel Peribadi<br>6. Emel Syarikat (diperlukan jika Kategori Pemohon = Syarikat)</div>');
+    ? 'To help us assist you more accurately, please provide the following information:<div class="info-box faq-customer-info-box">1. Full Name<br>2. Phone Number<br>3. State</div>'
+    : 'Untuk membantu kami membantu anda dengan lebih tepat, sila berikan maklumat berikut:<div class="info-box faq-customer-info-box">1. Nama Penuh<br>2. Nombor Telefon<br>3. Negeri</div>');
   await showTyping(450);
   await addMsg(state.en ? 'May I have your <strong>full name</strong> please?' : 'Boleh saya dapatkan <strong>nama penuh</strong> anda?');
   setInput(true);
@@ -2126,7 +2088,7 @@ function renderAssistanceForm() {
     }).join('');
 
   const categoryOptionsHtml = ['individual', 'company'].map(value => {
-    const selected = value === state.faqApplicantCategory ? ' selected' : '';
+    const selected = value === (state.faqApplicantCategory || 'company') ? ' selected' : '';
     const text = value === 'company' ? labels.company : labels.individual;
     return `<option value="${value}"${selected}>${escapeHtml(text)}</option>`;
   }).join('');
@@ -2945,60 +2907,21 @@ async function handleStep(text) {
       return;
     }
     state.stateName = payload.state;
-    state.step = 'ask_faq_customer_category';
-    await showTyping(400);
-    await addMsg(state.en ? 'Are you enquiring as an <strong>Individual</strong> or a <strong>Company</strong>?' : 'Adakah anda membuat pertanyaan sebagai <strong>Individu</strong> atau <strong>Syarikat</strong>?');
-    setQR(faqApplicantCategoryOptions());
-    setInput(true);
+    await finishFaqCustomerInfoCollection();
     return;
   }
 
   if (state.step === 'ask_faq_customer_category') {
-    const payload = buildFaqApplicantCategoryPayload(text);
-    if (!payload) {
-      await showApiError({ message: 'Invalid applicant category.', errors: { applicant_category: 'Please choose Individual or Company.' } }, 'Invalid applicant category.');
-      await addMsg(state.en ? 'Are you enquiring as an <strong>Individual</strong> or a <strong>Company</strong>?' : 'Adakah anda membuat pertanyaan sebagai <strong>Individu</strong> atau <strong>Syarikat</strong>?');
-      setQR(faqApplicantCategoryOptions());
-      setInput(true);
-      return;
-    }
-    state.faqApplicantCategory = payload.category;
-    state.step = 'ask_faq_customer_email';
-    await showTyping(400);
-    await addMsg(state.en ? 'Please provide your <strong>personal email address</strong>.' : 'Sila berikan <strong>alamat emel peribadi</strong> anda.');
-    setInput(true);
+    await finishFaqCustomerInfoCollection();
     return;
   }
 
   if (state.step === 'ask_faq_customer_email') {
-    const payload = buildEmailPayload(text);
-    if (!payload) {
-      await showApiError({ message: 'Invalid email address.', errors: { email: 'Enter a valid email address.' } }, 'Invalid email address.');
-      await addMsg(state.en ? 'Please provide a valid <strong>personal email address</strong>.' : 'Sila berikan <strong>alamat emel peribadi</strong> yang sah.');
-      setInput(true);
-      return;
-    }
-    state.email = payload.email;
-    if (state.faqApplicantCategory === 'company') {
-      state.step = 'ask_faq_customer_company_email';
-      await showTyping(400);
-      await addMsg(state.en ? 'Please provide the <strong>company email address</strong>.' : 'Sila berikan <strong>alamat emel syarikat</strong>.');
-      setInput(true);
-      return;
-    }
     await finishFaqCustomerInfoCollection();
     return;
   }
 
   if (state.step === 'ask_faq_customer_company_email') {
-    const payload = buildEmailPayload(text);
-    if (!payload) {
-      await showApiError({ message: 'Invalid company email address.', errors: { company_email: 'Enter a valid email address.' } }, 'Invalid company email address.');
-      await addMsg(state.en ? 'Please provide a valid <strong>company email address</strong>.' : 'Sila berikan <strong>alamat emel syarikat</strong> yang sah.');
-      setInput(true);
-      return;
-    }
-    state.companyEmail = payload.email;
     await finishFaqCustomerInfoCollection();
     return;
   }
@@ -3022,8 +2945,8 @@ async function handleStep(text) {
       await addMsg(state.en ? `You are contacting us from <strong>${escapeHtml(payload.state)}</strong>.` : `Terima kasih! Anda menghubungi kami dari <strong>${escapeHtml(payload.state)}</strong>.`);
       await showTyping(650);
       await addMsg(state.en
-        ? 'To proceed with your <strong>Email ID Cancellation</strong> request, please provide the following:<div class="info-box">1. Full name (as per IC / Passport)<br>2. IC / Passport number<br>3. Mobile number<br>4. Email address<br>5. Identity document and signature after we collect your contact details</div>'
-        : 'Untuk meneruskan permohonan <strong>Pembatalan Email ID</strong> anda, sila sediakan maklumat berikut:<div class="info-box">1. Nama penuh (seperti dalam IC / Pasport)<br>2. Nombor IC / Pasport<br>3. Nombor telefon bimbit<br>4. Alamat emel<br>5. Dokumen pengenalan dan tandatangan selepas kami mengumpul maklumat hubungan anda</div>');
+        ? 'To proceed with your <strong>Individual Email ID Cancellation</strong> request, please provide the following:<div class="info-box">1. Full name (as per IC / Passport)<br>2. IC / Passport number<br>3. Mobile number<br>4. Email address<br>5. Identity document and signature after we collect your contact details</div>'
+        : 'Untuk meneruskan permohonan <strong>Pembatalan Email ID Individu</strong> anda, sila sediakan maklumat berikut:<div class="info-box">1. Nama penuh (seperti dalam IC / Pasport)<br>2. Nombor IC / Pasport<br>3. Nombor telefon bimbit<br>4. Alamat emel<br>5. Dokumen pengenalan dan tandatangan selepas kami mengumpul maklumat hubungan anda</div>');
       await showTyping(450);
       await addMsg(state.en ? 'May I have your <strong>full name</strong> please?' : 'Boleh saya dapatkan <strong>nama penuh</strong> anda?');
       setInput(true);
@@ -3138,8 +3061,8 @@ async function handleStep(text) {
       state.step = 'ask_company_state';
       await showTyping(450);
       await addMsg(state.en
-        ? 'Please provide the <strong>company state</strong> for RPA verification.'
-        : 'Sila berikan <strong>negeri syarikat</strong> untuk pengesahan RPA.');
+        ? 'Please provide the <strong>company state</strong> for verification.'
+        : 'Sila berikan <strong>negeri syarikat</strong> untuk semakan.');
       setQR(getStateSelectionOptions());
       setInput(true);
       await refreshSession();
@@ -3157,8 +3080,8 @@ async function handleStep(text) {
     if (!payload) {
       await showApiError({ message: 'Invalid Malaysian state selected.', errors: { state: 'Please choose a valid Malaysian state.' } }, 'Invalid Malaysian state selected.');
       await addMsg(state.en
-        ? 'Please provide the <strong>company state</strong> for RPA verification.'
-        : 'Sila berikan <strong>negeri syarikat</strong> untuk pengesahan RPA.');
+        ? 'Please provide the <strong>company state</strong> for verification.'
+        : 'Sila berikan <strong>negeri syarikat</strong> untuk semakan.');
       setQR(getStateSelectionOptions());
       setInput(true);
       return;
@@ -3177,8 +3100,8 @@ async function handleStep(text) {
     } catch (error) {
       await showApiError(error, 'Unable to save company state.');
       await addMsg(state.en
-        ? 'Please provide the <strong>company state</strong> for RPA verification.'
-        : 'Sila berikan <strong>negeri syarikat</strong> untuk pengesahan RPA.');
+        ? 'Please provide the <strong>company state</strong> for verification.'
+        : 'Sila berikan <strong>negeri syarikat</strong> untuk semakan.');
       setInput(true);
       return;
     }
