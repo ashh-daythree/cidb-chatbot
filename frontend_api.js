@@ -2012,9 +2012,9 @@ let assistanceFormIdCounter = 0;
 // Bahasa Malaysia dropdown strings, so these are stored/sent verbatim in BM regardless
 // of the chat language. Single option each for now; add more entries to expand.
 const ASSISTANCE_CLASSIFICATION_OPTIONS = {
-  cases_category: ['Pertanyaan'],
+  cases_category: ['Bantuan'],
   sub_category_1: ['Pendaftaran Kontraktor'],
-  sub_category_2: ['Prosedur pembaharuan PPK/SPKK/STB'],
+  sub_category_2: ['Masalah Teknikal'],
 };
 
 // Renewal type sent to the RPA bot as sCustomerType. Codes only, no translation.
