@@ -2362,6 +2362,10 @@ function buildCompanyPpkPayload(text) {
     return { value };
   }
 
+  if (/^[A-Z]{2}\d{7}$/.test(value)) {
+    return { value };
+  }
+
   return null;
 }
 

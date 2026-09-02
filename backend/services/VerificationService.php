@@ -504,8 +504,6 @@ final class VerificationService extends AbstractService
             'channel' => 'Chatbot',
             'fields' => [
                 'sCustomerType' => 'Company',
-                'sCompanyName' => $company['company_name'] ?? null,
-                'sSSMNumber' => $company['ppk_number'] ?? null,
                 'sContactNumber' => $this->resolveBotPayloadValue([
                     $draft['company_contact_number'] ?? null,
                     $draft['mobile'] ?? null,
@@ -519,6 +517,15 @@ final class VerificationService extends AbstractService
                 'sLocationArea' => $this->resolveBotPayloadValue([
                     $draft['state_name'] ?? null,
                     $context['state']['state'] ?? null,
+                ]),
+                'sCompanyName' => $company['company_name'] ?? null,
+                'sSSMNumber' => $company['ppk_number'] ?? null,
+                'sIdentificationNumber' => $this->resolveBotPayloadValue([
+                    $draft['director_identity_number_compact'] ?? null,
+                    $draft['director_identity_number'] ?? null,
+                ]),
+                'sCustomerName' => $this->resolveBotPayloadValue([
+                    $draft['director_full_name'] ?? null,
                 ]),
                 'sLanguage' => $this->resolveBotPayloadValue([
                     $request['submission_language_code'] ?? null,

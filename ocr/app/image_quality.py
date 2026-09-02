@@ -45,7 +45,7 @@ def check_image_quality(image: np.ndarray) -> QualityResult:
     if brightness > settings.max_brightness:
         issues.append("The image is too bright or overexposed.")
 
-    if bright_pixel_percentage > 20:
+    if bright_pixel_percentage > 45:
         issues.append("Too much glare or reflection was detected.")
 
     return QualityResult(
