@@ -429,8 +429,9 @@ final class VerificationService extends AbstractService
 
     /**
      * Builds the RPA ticket-insert payload for a FAQ assistance enquiry. Same envelope
-     * and same eight `fields` as buildBotPayload(); differs only in sCustomerType (the
-     * PPK/SPKK/STB renewal type) and sLanguage (the spoken-language word).
+     * as buildBotPayload(); sCustomerType carries the PPK/SPKK/STB renewal type and
+     * sLanguage the spoken-language word. The `cidb_masterbot` scenario also requires
+     * sCompanyName + sSSMNumber for this flow (the enquiry form is company-only).
      *
      * @param array<string, mixed> $context
      * @return array<string, mixed>
@@ -445,6 +446,8 @@ final class VerificationService extends AbstractService
                 'sCustomerType' => strtoupper(trim((string) ($context['topic_code'] ?? ''))),
                 'sCustomerName' => $this->resolveBotPayloadValue([$context['customer_name'] ?? null]),
                 'sIdentificationNumber' => $this->resolveBotPayloadValue([$context['id_number'] ?? null]),
+                'sCompanyName' => $this->resolveBotPayloadValue([$context['company_name'] ?? null]),
+                'sSSMNumber' => $this->resolveBotPayloadValue([$context['company_registration_no'] ?? null]),
                 'sContactNumber' => $this->resolveBotPayloadValue([$context['phone'] ?? null]),
                 'sEmail' => $this->resolveBotPayloadValue([$context['email'] ?? null]),
                 'sLocationArea' => $this->resolveBotPayloadValue([$context['state'] ?? null]),
@@ -454,6 +457,18 @@ final class VerificationService extends AbstractService
         ];
 
         $this->assertBotPayloadReady($botPayload);
+
+        $missing = [];
+        foreach (['sCompanyName', 'sSSMNumber'] as $field) {
+            if (trim((string) ($botPayload['fields'][$field] ?? '')) === '') {
+                $missing[] = $field;
+            }
+        }
+        if ($missing !== []) {
+            throw new AppException('RPA payload is missing required field(s).', 422, 'RPA_PAYLOAD_INVALID', [
+                'missing_fields' => $missing,
+            ]);
+        }
 
         return $botPayload;
     }
