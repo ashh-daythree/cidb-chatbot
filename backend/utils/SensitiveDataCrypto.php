@@ -13,6 +13,8 @@ final class SensitiveDataCrypto
 
     public static function encrypt(string $plaintext): string
     {
+        self::assertProductionConfiguration();
+
         if (self::isDevelopmentPassthroughEnabled()) {
             return $plaintext;
         }
@@ -61,5 +63,21 @@ final class SensitiveDataCrypto
     private static function isDevelopmentPassthroughEnabled(): bool
     {
         return filter_var(EnvironmentLoader::get('APP_DISABLE_HASHING', false), FILTER_VALIDATE_BOOL);
+    }
+
+    private static function assertProductionConfiguration(): void
+    {
+        $environment = strtolower(trim((string) EnvironmentLoader::get('APP_ENV', 'local')));
+        if ($environment !== 'production') {
+            return;
+        }
+
+        if (self::isDevelopmentPassthroughEnabled()) {
+            throw new ConfigurationException('APP_DISABLE_HASHING must be false in production.');
+        }
+
+        if (trim((string) EnvironmentLoader::get('APP_ENCRYPTION_KEY', '')) === '') {
+            throw new ConfigurationException('APP_ENCRYPTION_KEY must be configured in production.');
+        }
     }
 }

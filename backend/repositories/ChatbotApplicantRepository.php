@@ -18,7 +18,9 @@ final class ChatbotApplicantRepository extends BaseRepository
 
     public function findByIdentityNumber(string $identityNumber): ?array
     {
-        return $this->findOneBy(['identity_number' => $identityNumber]);
+        $normalized = preg_replace('/[\s-]+/', '', trim($identityNumber)) ?? trim($identityNumber);
+
+        return $this->findOneBy(['identity_number_hash' => hash('sha256', strtoupper($normalized))]);
     }
 
     public function findByStateCode(string $stateCode, int $limit = 100, int $offset = 0): array

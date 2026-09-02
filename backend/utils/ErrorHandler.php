@@ -28,6 +28,7 @@ final class ErrorHandler
 
     public function handleThrowable(Throwable $throwable): void
     {
+        $requestId = bin2hex(random_bytes(8));
         $statusCode = 500;
         $errorCode = 'SERVER_ERROR';
         $errors = [];
@@ -39,6 +40,9 @@ final class ErrorHandler
         }
 
         $this->logger->error($throwable->getMessage(), [
+            'request_id' => $requestId,
+            'request_method' => $_SERVER['REQUEST_METHOD'] ?? null,
+            'request_path' => $_SERVER['REQUEST_URI'] ?? null,
             'exception' => get_class($throwable),
             'file' => $throwable->getFile(),
             'line' => $throwable->getLine(),
@@ -54,6 +58,7 @@ final class ErrorHandler
         if (PHP_SAPI !== 'cli') {
             http_response_code($payload['statusCode']);
             header('Content-Type: application/json; charset=utf-8');
+            header('X-Request-ID: ' . $requestId);
         }
 
         echo JsonHelper::encode($payload['payload']);

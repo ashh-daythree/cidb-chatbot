@@ -1,5 +1,7 @@
-//const API_BASE_URL = window.location.origin;
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = window.location.protocol === 'file:'
+  || (window.location.hostname === 'localhost' && window.location.port === '5500')
+  ? 'http://localhost:8000'
+  : window.location.origin;
 const WORKFLOW_CODE = 'CIDB_EMAIL_ID_CANCELLATION';
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const FILE_POLICY = {

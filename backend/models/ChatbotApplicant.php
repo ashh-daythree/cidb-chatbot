@@ -20,9 +20,11 @@ final class ChatbotApplicant extends AbstractModel
     {
         return [
             'session_id',
-            'full_name',
+            'full_name_ciphertext',
+            'full_name_hash',
             'identity_type',
-            'identity_number',
+            'identity_number_ciphertext',
+            'identity_number_hash',
             'identity_number_last4',
             'state_code',
             'language_code',
