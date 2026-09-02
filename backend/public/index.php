@@ -9,6 +9,41 @@ use Cidb\Backend\Utils\ErrorHandler;
 
 require dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 
+// Serve the chat UI and its static assets. Under `php -S` this file is the
+// router script and receives every request, so anything not returned here
+// falls through to the JSON API router and 404s. The list is an allowlist:
+// the document root is the whole repository, so a denylist would eventually
+// leak source.
+if (PHP_SAPI === 'cli-server') {
+    $staticPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+    $docRoot = realpath($_SERVER['DOCUMENT_ROOT'] ?? '');
+
+    if ($docRoot !== false) {
+        if ($staticPath === '/' || $staticPath === '/index.html') {
+            $indexFile = $docRoot . DIRECTORY_SEPARATOR . 'home.html';
+            if (is_file($indexFile)) {
+                header('Content-Type: text/html; charset=utf-8');
+                readfile($indexFile);
+                return;
+            }
+        }
+
+        $isPublicAsset = $staticPath === '/home.html'
+            || $staticPath === '/frontend_api.js'
+            || str_starts_with($staticPath, '/assets/');
+
+        if ($isPublicAsset) {
+            $target = realpath($docRoot . $staticPath);
+            if ($target !== false
+                && is_file($target)
+                && str_starts_with($target, $docRoot . DIRECTORY_SEPARATOR)
+            ) {
+                return false;
+            }
+        }
+    }
+}
+
 $basePath = dirname(__DIR__, 2);
 $container = Bootstrap::create($basePath);
 
